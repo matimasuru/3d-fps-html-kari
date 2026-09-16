@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYBER STRIKE: VALORANT FPS (ULTIMATE FIX)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: #02040a; font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none; }
+    
+    #gameCanvas { width: 100vw; height: 100vh; display: block; }
+
+    /* ロビーUI */
+    #lobbyModal {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(5, 8, 16, 0.95); backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .card {
+      background: #0d1322; border: 1px solid #ff4655;
+      box-shadow: 0 0 30px rgba(255, 70, 85, 0.25); border-radius: 16px; padding: 28px;
+      text-align: center; max-width: 440px; width: 90%;
+    }
+    h1 { font-size: 32px; color: #ff4655; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #00ffcc; margin-bottom: 20px; letter-spacing: 1px; font-weight: bold; }
+    
+    .btn {
+      background: #ff4655; color: #fff; font-weight: 800; border: none;
+      padding: 12px 20px; border-radius: 6px; font-size: 14px; cursor: pointer;
+      width: 100%; margin: 6px 0; transition: all 0.15s ease;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .btn:hover { background: #ff5f6d; transform: translateY(-1px); }
+    .btn:disabled { background: #444; cursor: not-allowed; opacity: 0.6; }
+    .btn-sec { background: #1a233a; color: #fff; border: 1px solid #334466; }
+    .btn-sec:hover { background: #253252; }
+    
+    .input-group { display: flex; gap: 8px; margin-top: 8px; }
+    input[type="text"] {
+      flex: 1; background: #060913; border: 1px solid #334466; border-radius: 6px;
+      padding: 10px; color: #fff; font-size: 14px; text-align: center; outline: none; font-weight: bold;
+    }
+    input[type="text"]:focus { border-color: #ff4655; }
+
+    #qrContainer {
+      margin: 14px auto; padding: 12px; background: #fff; border-radius: 12px; display: inline-block;
+      min-width: 180px; min-height: 180px;
+    }
+
+    #scannerModal {
+      display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.92); z-index: 150; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #reader { width: 300px; max-width: 85vw; border-radius: 12px; overflow: hidden; border: 2px solid #ff4655; background: #000; }
+
+    /* HUD */
+    #hud { display: none; pointer-events: none; }
+    
+    .crosshair-container {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 40px; height: 40px; pointer-events: none;
+    }
+    .ch-dot { position: absolute; top: 19px; left: 19px; width: 2px; height: 2px; background: #00ffcc; }
+    .ch-line { position: absolute; background: #00ffcc; }
+    .ch-top { top: 8px; left: 19px; width: 2px; height: 6px; }
+    .ch-bottom { bottom: 8px; left: 19px; width: 2px; height: 6px; }
+    .ch-left { top: 19px; left: 8px; width: 6px; height: 2px; }
+    .ch-right { top: 19px; right: 8px; width: 6px; height: 2px; }
+
+    #hitmarker {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);
+      width: 24px; height: 24px; opacity: 0; transition: opacity 0.05s ease-out; pointer-events: none;
+    }
+    #hitmarker::before, #hitmarker::after { content:''; position: absolute; background: #ff4655; }
+    #hitmarker::before { top: 0; left: 10px; width: 4px; height: 24px; }
+    #hitmarker::after { top: 10px; left: 0; width: 24px; height: 4px; }
+
+    .status-panel {
+      position: absolute; bottom: 24px; left: 28px;
+      background: rgba(13, 19, 34, 0.85); border-left: 4px solid #00ffcc;
+      padding: 12px 20px; border-radius: 4px;
+    }
+    .hp-bar-bg { width: 180px; height: 8px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .hp-bar-fill { height: 100%; width: 100%; background: #00ffcc; transition: width 0.1s ease-out; }
+
+    .ammo-panel {
+      position: absolute; bottom: 24px; right: 28px;
+      background: rgba(13, 19, 34, 0.85); border-right: 4px solid #ff4655;
+      padding: 12px 20px; border-radius: 4px; text-align: right;
+    }
+    .ammo-count { font-size: 36px; font-weight: 900; color: #fff; font-style: italic; }
+
+    #lockPrompt {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(13, 19, 34, 0.95); padding: 28px 48px; border-radius: 12px; border: 2px solid #ff4655;
+      text-align: center; font-size: 22px; font-weight: 900; color: #fff; cursor: pointer; pointer-events: auto;
+      z-index: 50; display: block;
+    }
+
+    #hurtFlash {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle, transparent 20%, rgba(255, 70, 85, 0.6) 100%);
+      opacity: 0; transition: opacity 0.08s; pointer-events: none;
+    }
+
+    .dmg-popup {
+      position: absolute; font-weight: 900; font-size: 24px; color: #ffcc00;
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 0 0 8px #ffaa00; pointer-events: none;
+      animation: floatUp 0.5s ease-out forwards;
+    }
+    .dmg-popup.hs { font-size: 34px; color: #ff4655; text-shadow: 0 0 12px #ff4655; }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -40px) scale(0.8); }
+    }
+  </style>
+
+  <!-- External Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="hurtFlash"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="crosshair-container">
+    <div class="ch-dot"></div>
+    <div class="ch-line ch-top"></div>
+    <div class="ch-line ch-bottom"></div>
+    <div class="ch-line ch-left"></div>
+    <div class="ch-line ch-right"></div>
+    <div id="hitmarker"></div>
+  </div>
+  
+  <div class="status-panel">
+    <div style="font-size:11px; color:#88a0c0; font-weight:800;">AGENT STATUS</div>
+    <div style="font-size:15px; font-weight:900; margin-top:2px;">
+      <span id="myRole" style="color:#00ffcc;">-</span> | SCORE: <span id="scoreText" style="color:#fff;">0 - 0</span>
+    </div>
+    <div class="hp-bar-bg"><div id="hpFill" class="hp-bar-fill"></div></div>
+  </div>
+
+  <div class="ammo-panel">
+    <div style="font-size:12px; color:#ff4655; font-weight:900;">VANDAL</div>
+    <div class="ammo-count"><span id="ammoText">25</span><span style="font-size:16px; color:#667a9a;">/25</span></div>
+  </div>
+
+  <div id="lockPrompt">
+    CLICK TO PLAY
+    <div style="font-size:13px; color:#88a0c0; margin-top:8px; font-weight:normal;">
+      [WASD] 移動 | [Shift] 静音歩き | [Space] ジャンプ<br>
+      [右クリック] ADS | [左クリック] 射撃 | [R] リロード
+    </div>
+  </div>
+</div>
+
+<!-- QR Camera Modal -->
+<div id="scannerModal">
+  <div class="card">
+    <h2 style="color:#ff4655; margin-bottom:8px; font-size:20px;">QRスキャン</h2>
+    <div id="reader"></div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-sec" style="flex:1;" onclick="switchCamera()">🔄 カメラ切替</button>
+      <button class="btn btn-sec" style="flex:1;" onclick="stopScanner()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lobby Modal -->
+<div id="lobbyModal">
+  <div class="card" id="mainMenu">
+    <h1>CYBER STRIKE</h1>
+    <div class="subtitle" id="netStatus">CONNECTING TO NETWORK...</div>
+
+    <button class="btn" id="btnHost" disabled onclick="hostGame()">ホストとしてルーム作成</button>
+    <button class="btn btn-sec" id="btnScan" disabled onclick="startScanner()">📷 カメラでQRスキャン参加</button>
+
+    <div style="margin: 12px 0; color: #556688; font-size:11px; font-weight:bold;">- OR JOIN WITH ROOM ID -</div>
+    <div class="input-group">
+      <input type="text" id="roomIdInput" placeholder="ENTER ROOM ID" autocomplete="off" spellcheck="false">
+      <button class="btn" id="btnJoin" disabled style="width: auto; padding: 10px 16px;" onclick="joinGame()">参加</button>
+    </div>
+  </div>
+
+  <div class="card" id="hostMenu" style="display:none;">
+    <h1>ROOM HOST</h1>
+    <p style="font-size:12px; color:#aaa; margin-bottom:8px;">相手のカメラでQRコードをスキャンしてください</p>
+    <div id="qrContainer"></div>
+    <p style="font-size:12px; color:#00ffcc; margin-top:4px;">ROOM ID: <span id="displayRoomId" style="font-weight:bold; color:#fff;">-</span></p>
+    <button class="btn btn-sec" style="margin-top:10px;" onclick="copyRoomId()">ROOM IDをコピー</button>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. Web Audio Engine
+// ==========================================
+class SoundEngine {
+  constructor() { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+  ensureCtx() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
+
+  playShoot() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'square'; osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.09);
+    gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.09);
+  }
+
+  playBodyHit() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(700, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+    gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.08);
+  }
+
+  playHeadshot() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(2600, now);
+    osc.frequency.exponentialRampToValueAtTime(1400, now + 0.2);
+    gain.gain.setValueAtTime(0.7, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.2);
+  }
+
+  playKill() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(550, now + 0.22);
+    gain.gain.setValueAtTime(0.6, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.22);
+  }
+}
+const audio = new SoundEngine();
+
+// ==========================================
+// 2. Network & PeerJS
+// ==========================================
+let peer = null, conn = null;
+let isHost = false, isConnected = false, isGameActive = false;
+let myScore = 0, enemyScore = 0;
+let html5QrCode = null, availableCameras = [], currentCameraIndex = 0;
+
+function initPeer() {
+  peer = new Peer(null, {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peer.on('open', id => {
+    document.getElementById('netStatus').textContent = "ONLINE - READY";
+    document.getElementById('netStatus').style.color = "#00ffcc";
+    document.getElementById('btnHost').disabled = false;
+    document.getElementById('btnScan').disabled = false;
+    document.getElementById('btnJoin').disabled = false;
+  });
+
+  peer.on('connection', c => {
+    conn = c;
+    setupConnection();
+  });
+
+  peer.on('error', err => {
+    console.error("Peer Error:", err);
+    alert("通信接続エラーが発生しました。再読み込みをお試しください。");
+  });
+}
+
+function hostGame() {
+  if (!peer || !peer.id) return alert('サーバー初期化中です。少し待って再試行してください。');
+  isHost = true;
+  document.getElementById('mainMenu').style.display = 'none';
+  document.getElementById('hostMenu').style.display = 'block';
+  document.getElementById('displayRoomId').textContent = peer.id;
+
+  const container = document.getElementById('qrContainer');
+  container.innerHTML = '';
+  new QRCode(container, { text: peer.id, width: 180, height: 180 });
+}
+
+function joinGame(targetRoomId) {
+  const targetId = targetRoomId || document.getElementById('roomIdInput').value.trim();
+  if (!targetId) return alert('ROOM IDを入力してください');
+  isHost = false;
+  conn = peer.connect(targetId);
+  setupConnection();
+}
+
+function copyRoomId() {
+  navigator.clipboard.writeText(peer.id);
+  alert('ROOM IDをコピーしました！');
+}
+
+async function startScanner() {
+  document.getElementById('scannerModal').style.display = 'flex';
+  if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
+  try {
+    availableCameras = await Html5Qrcode.getCameras();
+    if (availableCameras && availableCameras.length > 0) {
+      let backIdx = availableCameras.findIndex(cam => {
+        const l = cam.label.toLowerCase();
+        return l.includes('back') || l.includes('rear') || l.includes('environment');
+      });
+      currentCameraIndex = backIdx !== -1 ? backIdx : 0;
+      runScanner(availableCameras[currentCameraIndex].id);
+    } else { runScanner({ facingMode: "environment" }); }
+  } catch (err) { runScanner({ facingMode: "environment" }); }
+}
+
+function runScanner(camConfig) {
+  html5QrCode.start(camConfig, { fps: 20, qrbox: { width: 200, height: 200 } },
+    (text) => { stopScanner(); joinGame(text.trim()); }, () => {}
+  );
+}
+
+async function switchCamera() {
+  if (!html5QrCode) return;
+  await html5QrCode.stop();
+  if (availableCameras.length > 0) {
+    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+    runScanner(availableCameras[currentCameraIndex].id);
+  }
+}
+
+function stopScanner() {
+  if (html5QrCode && html5QrCode.isScanning) {
+    html5QrCode.stop().then(() => document.getElementById('scannerModal').style.display = 'none');
+  } else { document.getElementById('scannerModal').style.display = 'none'; }
+}
+
+function setupConnection() {
+  conn.on('open', () => {
+    isConnected = true; isGameActive = true;
+    document.getElementById('lobbyModal').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('myRole').textContent = isHost ? "HOST (RED)" : "GUEST (BLUE)";
+    resetGame();
+  });
+  conn.on('data', data => handleNetworkData(data));
+}
+
+function sendData(data) { if (conn && isConnected) conn.send(data); }
+
+// ==========================================
+// 3. Three.js Render & World
+// ==========================================
+const canvas = document.getElementById('gameCanvas');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050810, 0.018);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+const dirLight = new THREE.DirectionalLight(0xff4655, 0.8);
+dirLight.position.set(20, 40, 20); scene.add(dirLight);
+
+const obstacles = [];
+function buildMap() {
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.MeshStandardMaterial({ color: 0x0a0f1d, roughness: 0.5 })
+  );
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+
+  const grid = new THREE.GridHelper(100, 40, 0xff4655, 0x1a233a);
+  grid.position.y = 0.01; scene.add(grid);
+
+  addBlock(0, 2.5, 0, 12, 5, 12, 0xff4655);
+  addBlock(-18, 2, -18, 8, 4, 8, 0x00ffcc);
+  addBlock(18, 2, 18, 8, 4, 8, 0x0088ff);
+}
+
+function addBlock(x, y, z, w, h, d, color) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.3 })
+  );
+  mesh.position.set(x, y, z); scene.add(mesh);
+  obstacles.push({ minX: x - w/2, maxX: x + w/2, minZ: z - d/2, maxZ: z + d/2, topY: y + h/2 });
+}
+buildMap();
+
+// Remote Player Model
+const remoteGroup = new THREE.Group();
+const remoteBody = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.6, 0.6, 1.4, 16),
+  new THREE.MeshStandardMaterial({ color: 0xff4655 })
+);
+remoteBody.position.y = 0.7; remoteGroup.add(remoteBody);
+
+const remoteHead = new THREE.Mesh(
+  new THREE.SphereGeometry(0.38, 16, 16),
+  new THREE.MeshStandardMaterial({ color: 0xffffff })
+);
+remoteHead.position.y = 1.6; remoteGroup.add(remoteHead);
+
+const hitboxGroup = new THREE.Group();
+const bodyHitbox = new THREE.Mesh(
+  new THREE.BoxGeometry(1.2, 1.4, 1.2),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+bodyHitbox.position.y = 0.7; bodyHitbox.userData = { type: 'body' };
+hitboxGroup.add(bodyHitbox);
+
+const headHitbox = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 12, 12),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+headHitbox.position.y = 1.6; headHitbox.userData = { type: 'head' };
+hitboxGroup.add(headHitbox);
+
+remoteGroup.add(hitboxGroup);
+scene.add(remoteGroup);
+
+// Gun Mesh
+const gunGroup = new THREE.Group();
+const gunMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.1, 0.14, 0.6),
+  new THREE.MeshStandardMaterial({ color: 0x111622 })
+);
+gunGroup.add(gunMesh);
+gunGroup.position.set(0.2, -0.2, -0.4);
+camera.add(gunGroup); scene.add(camera);
+
+const particles = [];
+function createSparks(pos, color = 0x00ffcc, count = 8) {
+  for (let i = 0; i < count; i++) {
+    const p = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.05, 0.05),
+      new THREE.MeshBasicMaterial({ color })
+    );
+    p.position.copy(pos);
+    const vel = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.3,
+      (Math.random() - 0.5) * 0.3 + 0.1,
+      (Math.random() - 0.5) * 0.3
+    );
+    scene.add(p);
+    particles.push({ mesh: p, vel, life: 1.0 });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.mesh.position.add(p.vel);
+    p.life -= 0.08;
+    if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+  }
+}
+
+function spawnDamagePopup(val, point, isHeadshot) {
+  const div = document.createElement('div');
+  div.className = `dmg-popup ${isHeadshot ? 'hs' : ''}`;
+  div.textContent = isHeadshot ? `HS ${val}!` : `-${val}`;
+  document.body.appendChild(div);
+
+  const screenPos = point.clone().project(camera);
+  const x = (screenPos.x * .5 + .5) * window.innerWidth;
+  const y = (-(screenPos.y * .5) + .5) * window.innerHeight;
+  div.style.left = `${x}px`; div.style.top = `${y}px`;
+  setTimeout(() => div.remove(), 500);
+}
+
+// ==========================================
+// 4. Input & Control (フリーズ完全防止設計)
+// ==========================================
+let myX = 0, myY = 1.6, myZ = 0, myVy = 0;
+let yaw = 0, pitch = 0;
+let mouseDeltaX = 0, mouseDeltaY = 0; // マウス移動量を溜め込むバッファ
+let hp = 100, ammo = 25;
+let isGrounded = false, isADS = false, cooldown = 0, reloadTimer = 0;
+let screenShake = 0;
+
+const keys = {};
+
+// WASD等キー押下時のブラウザ干渉遮断
+window.addEventListener('keydown', e => {
+  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'KeyR'].includes(e.code)) {
+    if (document.pointerLockElement) {
+      e.preventDefault();
+    }
+  }
+  keys[e.code] = true;
+  if (e.code === 'KeyR' && ammo < 25 && reloadTimer === 0) reloadTimer = 50;
+});
+
+window.addEventListener('keyup', e => {
+  keys[e.code] = false;
+});
+
+// マウス移動は絶対フリーズさせず、バッファ（Delta）へ加算するだけにする
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement) {
+    mouseDeltaX += e.movementX;
+    mouseDeltaY += e.movementY;
+  }
+});
+
+// ポインターロック状態の監視とフォーカス自動強制切断
+document.addEventListener('pointerlockchange', () => {
+  const lockPrompt = document.getElementById('lockPrompt');
+  if (document.pointerLockElement === canvas) {
+    lockPrompt.style.display = 'none';
+    if (document.activeElement) document.activeElement.blur(); // 入力欄フォーカス解除
+  } else {
+    lockPrompt.style.display = 'block';
+  }
+});
+
+const lockPrompt = document.getElementById('lockPrompt');
+lockPrompt.addEventListener('click', () => {
+  if (document.activeElement) document.activeElement.blur();
+  canvas.requestPointerLock();
+});
+
+window.addEventListener('mousedown', e => {
+  if (document.pointerLockElement) {
+    if (e.button === 0) shoot();
+    if (e.button === 2) isADS = true;
+  }
+});
+window.addEventListener('mouseup', e => { if (e.button === 2) isADS = false; });
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+function shoot() {
+  if (cooldown > 0 || reloadTimer > 0) return;
+  if (ammo <= 0) { reloadTimer = 50; return; }
+
+  ammo--; cooldown = 8;
+  audio.playShoot();
+  gunGroup.position.z += 0.12;
+  pitch += 0.012;
+  screenShake = 0.04;
+
+  const raycaster = new THREE.Raycaster();
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  raycaster.set(camera.position, dir);
+
+  const endPoint = camera.position.clone().add(dir.clone().multiplyScalar(50));
+  const tracer = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([camera.position, endPoint]),
+    new THREE.LineBasicMaterial({ color: 0xff4655 })
+  );
+  scene.add(tracer); setTimeout(() => scene.remove(tracer), 20);
+
+  const intersects = raycaster.intersectObjects([...hitboxGroup.children, ...scene.children]);
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    if (hit.object.parent === hitboxGroup) {
+      const isHead = hit.object.userData.type === 'head';
+      const dmg = isHead ? 105 : 28;
+
+      sendData({ type: 'hit', damage: dmg, point: hit.point, isHeadshot: isHead });
+      showHitmarker();
+
+      if (isHead) { audio.playHeadshot(); createSparks(hit.point, 0xffcc00, 15); }
+      else { audio.playBodyHit(); createSparks(hit.point, 0xff4655, 8); }
+      spawnDamagePopup(dmg, hit.point, isHead);
+    } else {
+      createSparks(hit.point, 0x00ffcc, 4);
+    }
+  }
+}
+
+function showHitmarker() {
+  const hm = document.getElementById('hitmarker');
+  hm.style.opacity = '1'; setTimeout(() => hm.style.opacity = '0', 60);
+}
+
+// ==========================================
+// 5. Physics & Frame Loop
+// ==========================================
+function updatePhysics() {
+  if (!isConnected || !isGameActive) return;
+
+  // ① 蓄積されたマウス移動量（Delta）をフレーム内で安全に適用（WASD長押しでも固まらない）
+  if (mouseDeltaX !== 0 || mouseDeltaY !== 0) {
+    const sens = isADS ? 0.0012 : 0.0022;
+    yaw -= mouseDeltaX * sens;
+    pitch -= mouseDeltaY * sens;
+
+    const maxPitch = Math.PI / 2 - 0.02;
+    pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+
+    mouseDeltaX = 0;
+    mouseDeltaY = 0;
+  }
+
+  camera.rotation.set(pitch, yaw, 0, 'YXZ');
+
+  // ② 移動処理
+  let moveX = 0, moveZ = 0;
+  if (keys['KeyW']) moveZ -= 1;
+  if (keys['KeyS']) moveZ += 1;
+  if (keys['KeyA']) moveX -= 1;
+  if (keys['KeyD']) moveX += 1;
+
+  const speed = keys['ShiftLeft'] ? 0.07 : 0.15;
+
+  if (moveX !== 0 || moveZ !== 0) {
+    const len = Math.hypot(moveX, moveZ);
+    moveX /= len; moveZ /= len;
+
+    const cosY = Math.cos(yaw);
+    const sinY = Math.sin(yaw);
+
+    const vx = (moveX * cosY + moveZ * sinY) * speed;
+    const vz = (-moveX * sinY + moveZ * cosY) * speed;
+
+    if (!checkCollision(myX + vx, myZ)) myX += vx;
+    if (!checkCollision(myX, myZ + vz)) myZ += vz;
+  }
+
+  myVy -= 0.012; myY += myVy;
+
+  let floorY = 0;
+  obstacles.forEach(o => {
+    if (myX > o.minX && myX < o.maxX && myZ > o.minZ && myZ < o.maxZ) {
+      if (myY >= o.topY + 1.6) floorY = o.topY;
+    }
+  });
+
+  if (myY <= floorY + 1.6) {
+    myY = floorY + 1.6; myVy = 0; isGrounded = true;
+  }
+
+  if (keys['Space'] && isGrounded) {
+    myVy = 0.24; isGrounded = false; keys['Space'] = false;
+  }
+
+  myX = Math.max(-48, Math.min(48, myX));
+  myZ = Math.max(-48, Math.min(48, myZ));
+
+  camera.position.set(myX, myY, myZ);
+
+  if (screenShake > 0) {
+    camera.rotation.z = (Math.random() - 0.5) * screenShake;
+    screenShake *= 0.8;
+  } else { camera.rotation.z = 0; }
+
+  gunGroup.position.lerp(isADS ? new THREE.Vector3(0, -0.12, -0.3) : new THREE.Vector3(0.2, -0.2, -0.4), 0.2);
+  camera.fov = THREE.MathUtils.lerp(camera.fov, isADS ? 50 : 75, 0.2);
+  camera.updateProjectionMatrix();
+
+  updateParticles();
+
+  if (cooldown > 0) cooldown--;
+  if (reloadTimer > 0) {
+    reloadTimer--;
+    if (reloadTimer === 0) ammo = 25;
+  }
+
+  sendData({ type: 'sync', x: myX, y: myY, z: myZ, yaw: yaw });
+
+  document.getElementById('hpFill').style.width = `${Math.max(0, hp)}%`;
+  document.getElementById('ammoText').textContent = reloadTimer > 0 ? "..." : ammo;
+  document.getElementById('scoreText').textContent = `${myScore} - ${enemyScore}`;
+}
+
+function checkCollision(nx, nz) {
+  const r = 0.5;
+  for (let o of obstacles) {
+    if (nx + r > o.minX && nx - r < o.maxX && nz + r > o.minZ && nz - r < o.maxZ) {
+      if (myY < o.topY + 1.2) return true;
+    }
+  }
+  return false;
+}
+
+function handleNetworkData(data) {
+  if (data.type === 'sync') {
+    remoteGroup.position.set(data.x, data.y - 1.6, data.z);
+    remoteGroup.rotation.y = data.yaw;
+  } else if (data.type === 'hit') {
+    hp -= data.damage;
+    document.getElementById('hurtFlash').style.opacity = '1';
+    setTimeout(() => document.getElementById('hurtFlash').style.opacity = '0', 80);
+
+    if (hp <= 0) {
+      enemyScore++; sendData({ type: 'scored' });
+      resetGame();
+    }
+  } else if (data.type === 'scored') {
+    myScore++;
+    audio.playKill();
+    resetGame();
+  }
+}
+
+function resetGame() {
+  hp = 100; ammo = 25;
+  myX = isHost ? -25 : 25; myZ = isHost ? -25 : 25; myY = 1.6;
+  yaw = isHost ? Math.PI / 4 : -Math.PI * 0.75; pitch = 0;
+  camera.rotation.set(0, yaw, 0, 'YXZ');
+  remoteBody.material.color.setHex(isHost ? 0x0088ff : 0xff4655);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  updatePhysics();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+initPeer();
+animate();
+</script>
+</body>
+</html>
