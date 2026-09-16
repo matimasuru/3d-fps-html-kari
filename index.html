@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYBER STRIKE: VALORANT FPS (v3)</title>
+  <title>CYBER STRIKE: TACTICAL FPS (v4)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body, html { width: 100%; height: 100%; overflow: hidden; background: #02040a; font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none; }
@@ -55,6 +55,7 @@
     .err-text { font-size: 12px; color: #ff8a94; margin-top: 8px; min-height: 14px; }
     .manual-link { color: #88a0c0; font-size: 11px; text-decoration: underline; cursor: pointer; }
     .manual-link:hover { color: #fff; }
+    .hint-text { font-size: 11px; color: #667a9a; margin-top: 10px; }
 
     .spinner {
       width: 46px; height: 46px; border-radius: 50%; margin: 6px auto 0;
@@ -151,7 +152,23 @@
     }
     .radar-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); }
     #radarSelf { background: #00ffcc; box-shadow: 0 0 6px #00ffcc; }
-    #radarEnemy { background: #ff4655; box-shadow: 0 0 6px #ff4655; }
+
+    #scoreboardPanel {
+      position: absolute; top: 24px; left: 28px; min-width: 150px;
+      background: rgba(13, 19, 34, 0.85); border: 1px solid #334466; border-radius: 8px;
+      padding: 10px 14px;
+    }
+    #scoreboardPanel .sb-title { font-size: 10px; color: #667a9a; font-weight: 900; letter-spacing: 1px; margin-bottom: 6px; }
+    .sb-row { font-size: 13px; font-weight: 800; padding: 2px 0; }
+
+    #killFeed {
+      position: absolute; top: 150px; right: 28px; width: 220px; text-align: right;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .kf-item {
+      background: rgba(13,19,34,0.8); border-right: 3px solid #ff4655; border-radius: 4px;
+      padding: 5px 10px; font-size: 12px; font-weight: 700; color: #ddd;
+    }
 
     #matchEndOverlay, #disconnectOverlay {
       display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -160,9 +177,12 @@
     .end-title { font-size: 46px; font-weight: 900; letter-spacing: 4px; margin-bottom: 6px; }
     .end-title.win { color: #00ffcc; text-shadow: 0 0 20px rgba(0,255,204,0.6); }
     .end-title.lose { color: #ff4655; text-shadow: 0 0 20px rgba(255,70,85,0.6); }
+    #endScoreboard { text-align: left; margin: 12px 0 18px; }
+    #endScoreboard .sb-row { font-size: 15px; }
 
     @media (max-width: 480px) {
       #radar { display: none; }
+      #killFeed { display: none; }
     }
   </style>
 
@@ -191,15 +211,21 @@
   <div id="killBanner">ELIMINATED</div>
   <div id="pointBanner">MATCH POINT</div>
 
+  <div id="scoreboardPanel">
+    <div class="sb-title">SCOREBOARD</div>
+    <div id="scoreboardList"></div>
+  </div>
+
   <div id="radar">
     <div class="radar-dot" id="radarSelf" style="left:60px; top:60px;"></div>
-    <div class="radar-dot" id="radarEnemy" style="left:60px; top:60px; display:none;"></div>
   </div>
+
+  <div id="killFeed"></div>
 
   <div class="status-panel">
     <div style="font-size:11px; color:#88a0c0; font-weight:800;">AGENT STATUS</div>
     <div style="font-size:15px; font-weight:900; margin-top:2px;">
-      <span id="myRole" style="color:#00ffcc;">-</span> | SCORE: <span id="scoreText" style="color:#fff;">0 - 0</span>
+      <span id="myRole" style="color:#00ffcc;">-</span>
       <span id="sneakTag">SNEAK</span>
     </div>
     <div class="hp-bar-bg"><div id="hpFill" class="hp-bar-fill"></div></div>
@@ -207,9 +233,9 @@
   </div>
 
   <div class="ammo-panel">
-    <div style="font-size:12px; color:#ff4655; font-weight:900;" id="weaponName">VANDAL</div>
+    <div style="font-size:12px; color:#ff4655; font-weight:900;" id="weaponName">STRIKER</div>
     <div class="ammo-count"><span id="ammoText">25</span><span id="ammoMax" style="font-size:16px; color:#667a9a;">/25</span></div>
-    <div id="weaponHint">[1] VANDAL　[2] SIDEARM</div>
+    <div id="weaponHint">[1] STRIKER　[2] PISTOL</div>
   </div>
 
   <div id="lockPrompt">
@@ -225,8 +251,8 @@
 <div id="matchEndOverlay">
   <div class="card">
     <div class="end-title" id="endTitle">WIN</div>
-    <div style="color:#aaa; font-size:13px; margin-bottom:16px;">SCORE: <span id="endScore">5 - 2</span></div>
-    <button class="btn" onclick="requestRematch()">もう一度対戦する</button>
+    <div id="endScoreboard"></div>
+    <button class="btn" id="btnRestart" onclick="hostRestart()">もう一度対戦する</button>
     <button class="btn btn-sec" onclick="location.reload()">ロビーに戻る</button>
   </div>
 </div>
@@ -234,7 +260,7 @@
 <div id="disconnectOverlay">
   <div class="card">
     <div class="end-title lose" style="font-size:28px;">接続が切断されました</div>
-    <p style="color:#aaa; font-size:13px; margin:10px 0 16px;">相手との通信が切れました。ロビーに戻ってやり直してください。</p>
+    <p style="color:#aaa; font-size:13px; margin:10px 0 16px;">ホストとの通信が切れました。ロビーに戻ってやり直してください。</p>
     <button class="btn" onclick="location.reload()">ロビーに戻る</button>
   </div>
 </div>
@@ -265,7 +291,7 @@
     </div>
 
     <div id="manualPanel" style="display:none; margin-top:10px;">
-      <button class="btn btn-sec" id="btnHost" disabled onclick="hostGame()">ホストとしてルーム作成</button>
+      <button class="btn btn-sec" id="btnHost" disabled onclick="hostGame()">ホストとしてルーム作成(最大6人)</button>
       <button class="btn btn-sec" id="btnScan" disabled onclick="startScanner()">📷 カメラでQRスキャン参加</button>
       <div style="margin: 12px 0; color: #556688; font-size:11px; font-weight:bold;">- OR JOIN WITH ROOM CODE -</div>
       <div class="input-group">
@@ -285,11 +311,12 @@
 
   <div class="card" id="hostMenu" style="display:none;">
     <h1>ROOM HOST</h1>
-    <p style="font-size:12px; color:#aaa; margin-bottom:8px;">相手のカメラでQRコードをスキャンするか、下の短いコードを伝えてください</p>
+    <p style="font-size:12px; color:#aaa; margin-bottom:8px;">相手のカメラでQRコードをスキャンするか、下の短いコードを伝えてください(最大5人まで途中参加OK)</p>
     <div id="qrContainer"></div>
     <div class="room-code-big" id="displayRoomId">------</div>
     <button class="btn btn-sec" style="margin-top:10px;" onclick="copyRoomId()">コードをコピー</button>
     <button class="btn btn-sec" onclick="location.reload()">キャンセル</button>
+    <div class="hint-text" id="hostWaitStatus">対戦相手を待っています…</div>
     <div class="err-text" id="hostErr"></div>
   </div>
 </div>
@@ -299,6 +326,7 @@
 // 0. 定数
 // ==========================================
 const SCORE_LIMIT = 5;
+const MAX_PLAYERS = 6; // ホスト+ゲスト5人まで
 const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 紛らわしい 0/O/1/I/L は除外
 const ICE_CONFIG = {
   iceServers: [
@@ -306,14 +334,28 @@ const ICE_CONFIG = {
     { urls: 'stun:stun1.l.google.com:19302' }
   ]
 };
-// 自動マッチメイキング用の共有ロビースロット（サーバーを持たないため、
-// 決まった名前のスロットを順番に探す/使うことで擬似的な自動マッチングを実現している）
 const LOBBY_SLOTS = ['CS-ARENA-1','CS-ARENA-2','CS-ARENA-3','CS-ARENA-4','CS-ARENA-5','CS-ARENA-6'];
 
 const WEAPONS = {
-  vandal:  { key: '1', name: 'VANDAL',  mag: 25, dmgBody: 28, dmgHead: 105, cooldown: 8, reloadFrames: 50 },
-  sidearm: { key: '2', name: 'SIDEARM', mag: 12, dmgBody: 16, dmgHead: 60,  cooldown: 5, reloadFrames: 30 }
+  vandal:  { key: '1', name: 'STRIKER', mag: 25, dmgBody: 28, dmgHead: 105, cooldown: 8, reloadFrames: 50 },
+  sidearm: { key: '2', name: 'PISTOL',  mag: 12, dmgBody: 16, dmgHead: 60,  cooldown: 5, reloadFrames: 30 }
 };
+
+const COLOR_POOL = [0xff4655, 0x00ffcc, 0x0088ff, 0xffaa00, 0x8855ff, 0x33ff77];
+const SPAWN_POINTS = [
+  { x: -25, z: -25, yaw: Math.PI / 4 },
+  { x: 25,  z: 25,  yaw: -Math.PI * 0.75 },
+  { x: -25, z: 25,  yaw: -Math.PI / 4 },
+  { x: 25,  z: -25, yaw: Math.PI * 0.75 },
+  { x: 0,   z: -38, yaw: 0 },
+  { x: 0,   z: 38,  yaw: Math.PI }
+];
+let spawnCursor = 0;
+function nextSpawn() {
+  const s = SPAWN_POINTS[spawnCursor % SPAWN_POINTS.length];
+  spawnCursor++;
+  return s;
+}
 
 function generateRoomCode() {
   let code = "";
@@ -328,6 +370,7 @@ function shuffle(arr) {
   }
   return a;
 }
+function hexColor(c) { return '#' + c.toString(16).padStart(6, '0'); }
 
 // ==========================================
 // 1. Web Audio Engine
@@ -376,12 +419,13 @@ class SoundEngine {
     osc.start(now); osc.stop(now + 0.22);
   }
 
-  playStep() {
+  playStep(volume) {
     this.ensureCtx(); const now = this.ctx.currentTime;
+    const v = (typeof volume === 'number') ? volume : 0.15;
     const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
     osc.type = 'triangle'; osc.frequency.setValueAtTime(120, now);
     osc.frequency.exponentialRampToValueAtTime(60, now + 0.05);
-    gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+    gain.gain.setValueAtTime(v, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
     osc.connect(gain); gain.connect(this.ctx.destination);
     osc.start(now); osc.stop(now + 0.05);
   }
@@ -408,30 +452,242 @@ class SoundEngine {
 const audio = new SoundEngine();
 
 // ==========================================
-// 2. Network & PeerJS
+// 2. Network state
 // ==========================================
-let peer = null, conn = null;
+let peer = null;
+let hostConn = null;              // ゲスト側: ホストへの接続
+let guestConns = new Map();       // ホスト側: id -> DataConnection
 let isHost = false, isConnected = false, isGameActive = false;
-let myScore = 0, enemyScore = 0;
+let myId = null, myName = null, myColor = COLOR_POOL[0];
+let scoreboard = new Map();       // id -> { name, color, score }
+let remotePlayers = new Map();    // id -> { group, hitboxGroup, target, color, name }
+let killFeedItems = [];
+let lastHitBy = null;
+let pointBannerShown = false;
+
 let html5QrCode = null, currentFacingMode = "environment";
 let myRoomCode = "";
 let peerInitAttempts = 0;
-let currentSlotResolver = null; // 自動マッチング中の「今試している1件」を解決するための一時コールバック
+let currentSlotResolver = null;
 let matchmakingActive = false;
 
 function setLobbyError(msg) { document.getElementById('lobbyErr').textContent = msg || ""; }
 function setMatchStatus(msg) { document.getElementById('matchStatus').textContent = msg; }
 
+function nameOf(id) {
+  if (id === myId) return myName || 'YOU';
+  const e = scoreboard.get(id);
+  return e ? e.name : '???';
+}
+
+// --- 送受信の共通処理 ---
+function emit(msg) {
+  msg.senderId = myId;
+  if (isHost) {
+    applyMessage(msg);
+    broadcast(msg, null);
+  } else if (hostConn && hostConn.open) {
+    try { hostConn.send(msg); } catch (e) {}
+  }
+}
+function broadcast(msg, excludeId) {
+  guestConns.forEach((c, id) => {
+    if (id !== excludeId && c.open) { try { c.send(msg); } catch (e) {} }
+  });
+}
+
+function applyMessage(msg) {
+  switch (msg.type) {
+    case 'sync': {
+      if (msg.senderId !== myId) {
+        const rp = remotePlayers.get(msg.senderId);
+        if (rp) rp.target = { x: msg.x, y: msg.y, z: msg.z, yaw: msg.yaw };
+      }
+      break;
+    }
+    case 'step': {
+      if (msg.senderId !== myId) audio.playStep();
+      break;
+    }
+    case 'hit': {
+      if (msg.targetId === myId && hp > 0) {
+        hp -= msg.damage;
+        lastHitBy = msg.senderId;
+        document.getElementById('hurtFlash').style.opacity = '1';
+        setTimeout(() => document.getElementById('hurtFlash').style.opacity = '0', 80);
+        screenShake = Math.max(screenShake, 0.08);
+        if (hp <= 0) reportDeath(lastHitBy);
+      }
+      break;
+    }
+    case 'died': {
+      if (scoreboard.has(msg.killerId)) scoreboard.get(msg.killerId).score++;
+      addKillFeed(nameOf(msg.killerId), nameOf(msg.deadId));
+      if (msg.killerId === myId) { showKillBanner(); audio.playKill(); hitStopFrames = 6; }
+      renderScoreboard();
+      checkPointBanner();
+      checkWinCondition(msg.killerId);
+      break;
+    }
+    case 'join': {
+      handleJoin(msg.id, msg.name, msg.color, { x: msg.x, y: msg.y, z: msg.z, yaw: msg.yaw });
+      break;
+    }
+    case 'leave': {
+      handleLeave(msg.id);
+      break;
+    }
+    case 'restart': {
+      doRestartLocal();
+      break;
+    }
+  }
+}
+
+function reportDeath(killerId) {
+  const payload = { type: 'died', deadId: myId, killerId };
+  applyMessage(payload);
+  if (isHost) broadcast(payload, null);
+  else if (hostConn && hostConn.open) { try { hostConn.send(payload); } catch (e) {} }
+  respawnSelf();
+}
+
+function checkWinCondition(killerId) {
+  const entry = scoreboard.get(killerId);
+  if (entry && entry.score >= SCORE_LIMIT && isGameActive) {
+    isGameActive = false;
+    showMatchEnd(killerId);
+  }
+}
+function checkPointBanner() {
+  if (pointBannerShown) return;
+  let anyOnPoint = false;
+  scoreboard.forEach(v => { if (v.score === SCORE_LIMIT - 1) anyOnPoint = true; });
+  if (anyOnPoint) {
+    pointBannerShown = true;
+    const el = document.getElementById('pointBanner');
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1200);
+  }
+}
+
+// --- キルフィード / スコアボード ---
+function addKillFeed(killerName, deadName) {
+  killFeedItems.push({ text: `${killerName} ▶ ${deadName}`, t: performance.now() });
+  if (killFeedItems.length > 5) killFeedItems.shift();
+  renderKillFeed();
+}
+function renderKillFeed() {
+  const el = document.getElementById('killFeed');
+  el.innerHTML = killFeedItems.map(k => `<div class="kf-item">${k.text}</div>`).join('');
+}
+setInterval(() => {
+  const now = performance.now();
+  const before = killFeedItems.length;
+  killFeedItems = killFeedItems.filter(k => now - k.t < 5000);
+  if (killFeedItems.length !== before) renderKillFeed();
+}, 1000);
+
+function renderScoreboard() {
+  const arr = Array.from(scoreboard.entries()).map(([id, v]) => ({ id, ...v }));
+  arr.sort((a, b) => b.score - a.score);
+  const rowsHtml = arr.map(p => `<div class="sb-row" style="color:${hexColor(p.color)}">${p.name}${p.id === myId ? ' (YOU)' : ''}: ${p.score}</div>`).join('');
+  const listEl = document.getElementById('scoreboardList');
+  if (listEl) listEl.innerHTML = rowsHtml;
+  const endEl = document.getElementById('endScoreboard');
+  if (endEl) endEl.innerHTML = rowsHtml;
+}
+
+// --- レーダー ---
+function createRadarDot(id, color) {
+  const el = document.createElement('div');
+  el.className = 'radar-dot';
+  el.id = 'radar-' + id;
+  el.style.background = hexColor(color);
+  el.style.boxShadow = '0 0 6px ' + hexColor(color);
+  document.getElementById('radar').appendChild(el);
+}
+function removeRadarDot(id) {
+  const el = document.getElementById('radar-' + id);
+  if (el) el.remove();
+}
+
+// --- プレイヤーの入退室 ---
+function handleJoin(id, name, color, pos) {
+  if (id === myId || remotePlayers.has(id)) return;
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6, 0.6, 1.4, 16),
+    new THREE.MeshStandardMaterial({ color })
+  );
+  body.position.y = 0.7; group.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.38, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff })
+  );
+  head.position.y = 1.6; group.add(head);
+
+  const hitboxGroup = new THREE.Group();
+  const bodyHitbox = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 1.4, 1.2),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  bodyHitbox.position.y = 0.7; bodyHitbox.userData = { type: 'body', ownerId: id };
+  hitboxGroup.add(bodyHitbox);
+
+  const headHitbox = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 12, 12),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  headHitbox.position.y = 1.6; headHitbox.userData = { type: 'head', ownerId: id };
+  hitboxGroup.add(headHitbox);
+
+  group.add(hitboxGroup);
+  group.position.set(pos.x, (pos.y || 1.6) - 1.6, pos.z);
+  group.rotation.y = pos.yaw || 0;
+  scene.add(group);
+
+  remotePlayers.set(id, {
+    id, group, hitboxGroup, color, name,
+    target: { x: pos.x, y: pos.y || 1.6, z: pos.z, yaw: pos.yaw || 0 }
+  });
+  if (!scoreboard.has(id)) scoreboard.set(id, { name, color, score: 0 });
+  createRadarDot(id, color);
+  renderScoreboard();
+}
+function handleLeave(id) {
+  const rp = remotePlayers.get(id);
+  if (rp) { scene.remove(rp.group); remotePlayers.delete(id); }
+  scoreboard.delete(id);
+  removeRadarDot(id);
+  renderScoreboard();
+}
+function collectHitboxes() {
+  let arr = [];
+  remotePlayers.forEach(rp => arr.push(...rp.hitboxGroup.children));
+  return arr;
+}
+
+function toggleManualPanel() {
+  const panel = document.getElementById('manualPanel');
+  const link = document.getElementById('toggleManual');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  link.textContent = opening ? '友達をコードで招待する ▴' : '友達をコードで招待する ▾';
+}
+
 function attachPeerHandlers(p) {
   p.on('connection', c => {
-    if (conn && isConnected) { try { c.close(); } catch (e) {} return; } // 満室なら追加接続を拒否
-    conn = c;
-    setupConnection();
+    if (isHost) {
+      handleNewGuestConnection(c);
+    } else {
+      try { c.close(); } catch (e) {}
+    }
   });
 
   p.on('error', err => {
     console.error("Peer Error:", err);
-    // 自動マッチング中の接続試行が失敗した場合はそちらを優先して処理
     if (currentSlotResolver && (err.type === 'peer-unavailable' || err.type === 'unavailable-id')) {
       const r = currentSlotResolver; currentSlotResolver = null; r(false); return;
     }
@@ -456,6 +712,7 @@ function initPeer() {
 
   peer.on('open', id => {
     myRoomCode = id;
+    myId = id;
     document.getElementById('netStatus').textContent = "ONLINE - READY";
     document.getElementById('netStatus').style.color = "#00ffcc";
     document.getElementById('btnAutoMatch').disabled = false;
@@ -467,17 +724,26 @@ function initPeer() {
   attachPeerHandlers(peer);
 }
 
-function toggleManualPanel() {
-  const panel = document.getElementById('manualPanel');
-  const link = document.getElementById('toggleManual');
-  const opening = panel.style.display === 'none';
-  panel.style.display = opening ? 'block' : 'none';
-  link.textContent = opening ? '友達をコードで招待する ▴' : '友達をコードで招待する ▾';
+// --- ホスト初期化(自分自身をP1として登録) ---
+function initializeAsHost() {
+  isHost = true;
+  myName = 'P1';
+  myColor = COLOR_POOL[0];
+  const s = nextSpawn();
+  myX = s.x; myZ = s.z; myY = 1.6; yaw = s.yaw; pitch = 0; myVy = 0;
+  hp = 100;
+  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+  scoreboard.clear();
+  remotePlayers.forEach(v => scene.remove(v.group));
+  remotePlayers.clear();
+  scoreboard.set(myId, { name: myName, color: myColor, score: 0 });
+  camera.rotation.set(0, yaw, 0, 'YXZ');
+  renderScoreboard();
 }
 
 function hostGame() {
   if (!peer || !peer.id) return setLobbyError('サーバー初期化中です。少し待って再試行してください。');
-  isHost = true;
+  initializeAsHost();
   document.getElementById('mainMenu').style.display = 'none';
   document.getElementById('hostMenu').style.display = 'block';
   document.getElementById('displayRoomId').textContent = myRoomCode;
@@ -492,8 +758,9 @@ function joinGame(targetRoomId) {
   if (!targetId) { setLobbyError('ルームコードを入力してください'); return; }
   setLobbyError("");
   isHost = false;
-  conn = peer.connect(targetId, { reliable: true });
-  setupConnection();
+  const conn = peer.connect(targetId, { reliable: true });
+  hostConn = conn;
+  setupConnection(conn);
 }
 
 function copyRoomId() {
@@ -504,9 +771,6 @@ function copyRoomId() {
 }
 
 // --- 自動マッチメイキング ---
-// サーバーを持たない構成なので、決まった名前のロビースロットを
-// ①まず「誰かが既にホストしていないか」順番に接続を試み(=空いている試合を探す)、
-// ②誰も見つからなければ自分がそのスロット名でホストになって待つ、という方式で成立させている。
 async function startAutoMatch() {
   if (matchmakingActive) return;
   matchmakingActive = true;
@@ -544,13 +808,24 @@ function tryJoinSlot(slotId) {
       resolve(false);
     }, 2200);
 
-    testConn.on('open', () => {
+    const onOpen = () => {
       if (settled) return; settled = true; currentSlotResolver = null;
       clearTimeout(timer);
       isHost = false;
-      conn = testConn;
-      setupConnection();
+      hostConn = testConn;
+      setupConnection(testConn);
       resolve(true);
+    };
+    // 受信側では 'open' がすでに発火済みのことがあるため、まず現在の状態を確認する
+    if (testConn.open) { onOpen(); } else { testConn.on('open', onOpen); }
+
+    testConn.on('close', () => {
+      if (settled) return; settled = true; currentSlotResolver = null;
+      clearTimeout(timer); resolve(false);
+    });
+    testConn.on('error', () => {
+      if (settled) return; settled = true; currentSlotResolver = null;
+      clearTimeout(timer); resolve(false);
     });
   });
 }
@@ -575,8 +850,8 @@ function tryHostSlot(slotId) {
 
     p.on('open', id => {
       if (settled) return; settled = true;
-      isHost = true; myRoomCode = id;
-      setMatchStatus('対戦相手を待っています…');
+      myId = id; myRoomCode = id;
+      initializeAsHost();
       resolve(true);
     });
     p.on('error', err => {
@@ -593,6 +868,7 @@ function cancelMatchmaking() {
   document.getElementById('matchmakingMenu').style.display = 'none';
   document.getElementById('mainMenu').style.display = 'block';
   peerInitAttempts = 0;
+  isHost = false;
   if (peer) { try { peer.destroy(); } catch (e) {} }
   initPeer();
 }
@@ -642,17 +918,104 @@ function stopScanner() {
   } else { document.getElementById('scannerModal').style.display = 'none'; }
 }
 
-function setupConnection() {
-  conn.on('open', () => {
-    isConnected = true; isGameActive = true;
-    document.getElementById('lobbyModal').style.display = 'none';
-    document.getElementById('hud').style.display = 'block';
-    document.getElementById('myRole').textContent = isHost ? "HOST (RED)" : "GUEST (BLUE)";
-    resetGame();
+// --- ゲスト側: ホストへの接続確立 ---
+function setupConnection(conn) {
+  const onOpen = () => {
+    // 'open' は接続確立時に一度だけ発火。ここでは特に何もせず 'welcome' を待つ
+  };
+  if (conn.open) { onOpen(); } else { conn.on('open', onOpen); }
+
+  conn.on('data', data => {
+    if (!data || !data.type) return;
+    if (data.type === 'welcome') { applyWelcome(data); }
+    else { applyMessage(data); }
   });
-  conn.on('data', data => handleNetworkData(data));
   conn.on('close', () => handleDisconnect());
   conn.on('error', () => handleDisconnect());
+}
+
+function applyWelcome(data) {
+  myName = data.yourName; myColor = data.yourColor;
+  myX = data.spawn.x; myZ = data.spawn.z; myY = 1.6; yaw = data.spawn.yaw || 0; pitch = 0; myVy = 0;
+  hp = 100;
+  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+  pointBannerShown = false;
+
+  scoreboard.clear();
+  remotePlayers.forEach(v => scene.remove(v.group));
+  remotePlayers.clear();
+  scoreboard.set(myId, { name: myName, color: myColor, score: 0 });
+
+  (data.roster || []).forEach(p => {
+    handleJoin(p.id, p.name, p.color, { x: p.x, y: p.y, z: p.z, yaw: p.yaw });
+    if (scoreboard.has(p.id)) scoreboard.get(p.id).score = p.score || 0;
+  });
+
+  document.getElementById('lobbyModal').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('myRole').textContent = myName;
+  document.getElementById('myRole').style.color = hexColor(myColor);
+
+  isConnected = true; isGameActive = true;
+  camera.rotation.set(0, yaw, 0, 'YXZ');
+  renderScoreboard();
+}
+
+// --- ホスト側: 新規ゲスト接続の受け入れ ---
+function handleNewGuestConnection(conn) {
+  const onReady = () => {
+    if (guestConns.size >= MAX_PLAYERS - 1) { try { conn.close(); } catch (e) {} return; }
+    const id = conn.peer;
+    if (guestConns.has(id) || scoreboard.has(id)) return; // 二重登録防止
+    guestConns.set(id, conn);
+
+    const color = COLOR_POOL[scoreboard.size % COLOR_POOL.length];
+    const name = 'P' + (scoreboard.size + 1);
+    const spawn = nextSpawn();
+    scoreboard.set(id, { name, color, score: 0 });
+
+    const roster = [];
+    scoreboard.forEach((v, k) => {
+      if (k === id) return;
+      let pos;
+      if (k === myId) pos = { x: myX, y: myY, z: myZ, yaw: yaw };
+      else {
+        const rp = remotePlayers.get(k);
+        pos = rp ? { x: rp.group.position.x, y: rp.group.position.y + 1.6, z: rp.group.position.z, yaw: rp.group.rotation.y } : { x: 0, y: 1.6, z: 0, yaw: 0 };
+      }
+      roster.push({ id: k, name: v.name, color: v.color, score: v.score, x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw });
+    });
+
+    try { conn.send({ type: 'welcome', yourName: name, yourColor: color, spawn: { x: spawn.x, z: spawn.z, yaw: spawn.yaw }, roster }); } catch (e) {}
+
+    broadcast({ type: 'join', id, name, color, x: spawn.x, y: 1.6, z: spawn.z, yaw: spawn.yaw }, id);
+    handleJoin(id, name, color, { x: spawn.x, y: 1.6, z: spawn.z, yaw: spawn.yaw });
+    renderScoreboard();
+
+    conn.on('data', data => {
+      if (!data || !data.type) return;
+      data.senderId = id; // 送信元を偽装させない
+      applyMessage(data);
+      broadcast(data, id);
+    });
+    conn.on('close', () => {
+      guestConns.delete(id);
+      handleLeave(id);
+      broadcast({ type: 'leave', id }, id);
+      renderScoreboard();
+    });
+    conn.on('error', () => {});
+
+    if (!isGameActive) {
+      isGameActive = true; isConnected = true;
+      document.getElementById('lobbyModal').style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+      document.getElementById('myRole').textContent = myName;
+      document.getElementById('myRole').style.color = hexColor(myColor);
+    }
+    document.getElementById('hostWaitStatus').textContent = `プレイヤー ${scoreboard.size}/${MAX_PLAYERS} 参加中`;
+  };
+  if (conn.open) { onReady(); } else { conn.on('open', onReady); }
 }
 
 function handleDisconnect() {
@@ -661,11 +1024,6 @@ function handleDisconnect() {
   try { document.exitPointerLock(); } catch (e) {}
   document.getElementById('hud').style.display = 'none';
   document.getElementById('disconnectOverlay').style.display = 'flex';
-}
-
-function sendData(data) {
-  if (!conn || !isConnected) return;
-  try { conn.send(data); } catch (e) { /* 送信失敗は無視して次フレームへ */ }
 }
 
 // ==========================================
@@ -684,7 +1042,7 @@ const dirLight = new THREE.DirectionalLight(0xff4655, 0.8);
 dirLight.position.set(20, 40, 20); scene.add(dirLight);
 
 const obstacles = [];
-const worldMeshes = []; // 弾のあたり判定はこのリストだけを対象にする（自分の銃・カメラは含めない）
+const worldMeshes = [];
 
 function buildMap() {
   const floor = new THREE.Mesh(
@@ -702,6 +1060,8 @@ function buildMap() {
   addBlock(18, 2, 18, 8, 4, 8, 0x0088ff);
   addBlock(10, 1.5, -10, 6, 3, 6, 0xffaa00);
   addBlock(-10, 1.5, 10, 6, 3, 6, 0x8855ff);
+  addBlock(0, 1.5, -30, 10, 3, 4, 0x33ff77);
+  addBlock(0, 1.5, 30, 10, 3, 4, 0x33ff77);
 }
 
 function addBlock(x, y, z, w, h, d, color) {
@@ -714,40 +1074,6 @@ function addBlock(x, y, z, w, h, d, color) {
   obstacles.push({ minX: x - w/2, maxX: x + w/2, minZ: z - d/2, maxZ: z + d/2, topY: y + h/2 });
 }
 buildMap();
-
-// Remote Player Model
-const remoteGroup = new THREE.Group();
-const remoteBody = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.6, 0.6, 1.4, 16),
-  new THREE.MeshStandardMaterial({ color: 0xff4655 })
-);
-remoteBody.position.y = 0.7; remoteGroup.add(remoteBody);
-
-const remoteHead = new THREE.Mesh(
-  new THREE.SphereGeometry(0.38, 16, 16),
-  new THREE.MeshStandardMaterial({ color: 0xffffff })
-);
-remoteHead.position.y = 1.6; remoteGroup.add(remoteHead);
-
-const hitboxGroup = new THREE.Group();
-const bodyHitbox = new THREE.Mesh(
-  new THREE.BoxGeometry(1.2, 1.4, 1.2),
-  new THREE.MeshBasicMaterial({ visible: false })
-);
-bodyHitbox.position.y = 0.7; bodyHitbox.userData = { type: 'body' };
-hitboxGroup.add(bodyHitbox);
-
-const headHitbox = new THREE.Mesh(
-  new THREE.SphereGeometry(0.5, 12, 12),
-  new THREE.MeshBasicMaterial({ visible: false })
-);
-headHitbox.position.y = 1.6; headHitbox.userData = { type: 'head' };
-hitboxGroup.add(headHitbox);
-
-remoteGroup.add(hitboxGroup);
-scene.add(remoteGroup);
-
-let remoteTarget = { x: 0, y: 0, z: 0, yaw: 0, has: false };
 
 // Gun Mesh
 const gunGroup = new THREE.Group();
@@ -816,17 +1142,6 @@ function showKillBanner() {
   const el = document.getElementById('killBanner');
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 700);
-}
-
-let pointBannerShown = false;
-function showPointBannerIfNeeded() {
-  if (pointBannerShown) return;
-  if (myScore === SCORE_LIMIT - 1 || enemyScore === SCORE_LIMIT - 1) {
-    pointBannerShown = true;
-    const el = document.getElementById('pointBanner');
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 1200);
-  }
 }
 
 // ==========================================
@@ -925,6 +1240,7 @@ function tryDash() {
 }
 
 function shoot() {
+  if (hp <= 0) return;
   const w = WEAPONS[currentWeaponKey];
   if (cooldown > 0 || reloadTimer > 0) return;
   if (ammoByWeapon[currentWeaponKey] <= 0) { reloadTimer = w.reloadFrames; audio.playReload(); return; }
@@ -952,14 +1268,15 @@ function shoot() {
   );
   scene.add(tracer); setTimeout(() => scene.remove(tracer), 20);
 
-  const intersects = raycaster.intersectObjects([...hitboxGroup.children, ...worldMeshes], false);
+  const intersects = raycaster.intersectObjects([...collectHitboxes(), ...worldMeshes], false);
   if (intersects.length > 0) {
     const hit = intersects[0];
-    if (hit.object.parent === hitboxGroup) {
+    if (hit.object.userData && hit.object.userData.ownerId) {
+      const targetId = hit.object.userData.ownerId;
       const isHead = hit.object.userData.type === 'head';
       const dmg = isHead ? w.dmgHead : w.dmgBody;
 
-      sendData({ type: 'hit', damage: dmg, point: hit.point, isHeadshot: isHead });
+      emit({ type: 'hit', targetId, damage: dmg, isHeadshot: isHead });
       showHitmarker();
 
       if (isHead) { audio.playHeadshot(); createSparks(hit.point, 0xffcc00, 15); }
@@ -996,6 +1313,7 @@ function updatePhysics() {
   updateParticles();
   updateRadar();
   updateDashTag();
+  updateRemoteLerp();
 
   if (hitStopFrames > 0) {
     hitStopFrames--;
@@ -1005,7 +1323,7 @@ function updatePhysics() {
 
   const locked = document.pointerLockElement === canvas;
 
-  if (locked) {
+  if (locked && hp > 0) {
     if (mouseDeltaX !== 0 || mouseDeltaY !== 0) {
       const sens = isADS ? 0.0012 : 0.0022;
       yaw -= mouseDeltaX * sens;
@@ -1042,11 +1360,14 @@ function updatePhysics() {
 
       if (isGrounded && !sneakMode) {
         stepAccum += speed;
-        if (stepAccum > 1.1) { stepAccum = 0; audio.playStep(); }
+        if (stepAccum > 1.1) {
+          stepAccum = 0;
+          audio.playStep();
+          emit({ type: 'step' });
+        }
       }
     }
 
-    // ダッシュ（常に現在の向いている方向へ突進。押しっぱなしのWASD状態に依存しない独立処理）
     if (dashBoostTimer > 0) {
       dashBoostTimer--;
       const dvx = -Math.sin(yaw) * DASH_SPEED;
@@ -1097,7 +1418,7 @@ function updatePhysics() {
     const now = performance.now();
     if (now - lastSyncTime > 50) {
       lastSyncTime = now;
-      sendData({ type: 'sync', x: myX, y: myY, z: myZ, yaw: yaw });
+      emit({ type: 'sync', x: myX, y: myY, z: myZ, yaw: yaw });
     }
 
     updateCrosshair(isMoving, isGrounded);
@@ -1105,18 +1426,21 @@ function updatePhysics() {
 
   camera.rotation.set(pitch + recoilPitch, yaw + recoilYaw, camera.rotation.z, 'YXZ');
 
-  if (remoteTarget.has) {
-    remoteGroup.position.lerp(new THREE.Vector3(remoteTarget.x, remoteTarget.y - 1.6, remoteTarget.z), 0.35);
-    remoteGroup.rotation.y += (remoteTarget.yaw - remoteGroup.rotation.y) * 0.35;
-  }
-
   const w = WEAPONS[currentWeaponKey];
   document.getElementById('hpFill').style.width = `${Math.max(0, hp)}%`;
   document.getElementById('ammoText').textContent = reloadTimer > 0 ? "..." : ammoByWeapon[currentWeaponKey];
   document.getElementById('ammoMax').textContent = '/' + w.mag;
   document.getElementById('weaponName').textContent = w.name;
-  document.getElementById('scoreText').textContent = `${myScore} - ${enemyScore}`;
   document.getElementById('sneakTag').style.opacity = sneakMode ? '1' : '0';
+}
+
+function updateRemoteLerp() {
+  remotePlayers.forEach(rp => {
+    const t = rp.target;
+    rp.group.position.lerp(new THREE.Vector3(t.x, t.y - 1.6, t.z), 0.35);
+    let dy = t.yaw - rp.group.rotation.y;
+    rp.group.rotation.y += dy * 0.35;
+  });
 }
 
 function updateDashTag() {
@@ -1136,16 +1460,13 @@ function updateCrosshair(isMoving, grounded) {
 }
 
 function updateRadar() {
-  const selfEl = document.getElementById('radarSelf');
-  const enemyEl = document.getElementById('radarEnemy');
-  selfEl.style.left = '60px'; selfEl.style.top = '60px';
-  if (remoteTarget.has) {
-    const dx = remoteTarget.x - myX, dz = remoteTarget.z - myZ;
+  remotePlayers.forEach((rp, id) => {
+    const dx = rp.group.position.x - myX, dz = rp.group.position.z - myZ;
     const rx = Math.max(6, Math.min(114, 60 + dx));
     const ry = Math.max(6, Math.min(114, 60 + dz));
-    enemyEl.style.left = rx + 'px'; enemyEl.style.top = ry + 'px';
-    enemyEl.style.display = 'block';
-  }
+    const el = document.getElementById('radar-' + id);
+    if (el) { el.style.left = rx + 'px'; el.style.top = ry + 'px'; }
+  });
 }
 
 function checkCollision(nx, nz) {
@@ -1158,68 +1479,42 @@ function checkCollision(nx, nz) {
   return false;
 }
 
-function handleNetworkData(data) {
-  if (data.type === 'sync') {
-    remoteTarget = { x: data.x, y: data.y, z: data.z, yaw: data.yaw, has: true };
-  } else if (data.type === 'hit') {
-    hp -= data.damage;
-    document.getElementById('hurtFlash').style.opacity = '1';
-    setTimeout(() => document.getElementById('hurtFlash').style.opacity = '0', 80);
-    screenShake = Math.max(screenShake, 0.08);
-
-    if (hp <= 0) {
-      enemyScore++;
-      sendData({ type: 'scored' });
-      showPointBannerIfNeeded();
-      if (enemyScore >= SCORE_LIMIT) { endMatch(false); return; }
-      resetGame();
-    }
-  } else if (data.type === 'scored') {
-    myScore++;
-    audio.playKill();
-    showKillBanner();
-    hitStopFrames = 6;
-    showPointBannerIfNeeded();
-    if (myScore >= SCORE_LIMIT) { endMatch(true); return; }
-    resetGame();
-  } else if (data.type === 'rematch') {
-    myScore = 0; enemyScore = 0; hp = 100;
-    ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
-    pointBannerShown = false;
-    document.getElementById('matchEndOverlay').style.display = 'none';
-    isGameActive = true;
-    resetGame();
-  }
+// --- リスポーン / 試合終了 / リスタート ---
+function respawnSelf() {
+  if (!isGameActive) return;
+  const s = nextSpawn();
+  myX = s.x; myZ = s.z; myY = 1.6; yaw = s.yaw; pitch = 0; myVy = 0;
+  camera.rotation.set(0, yaw, 0, 'YXZ');
+  hp = 100;
+  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+  reloadTimer = 0;
 }
 
-function endMatch(won) {
-  isGameActive = false;
+function showMatchEnd(winnerId) {
   try { document.exitPointerLock(); } catch (e) {}
   const overlay = document.getElementById('matchEndOverlay');
   const title = document.getElementById('endTitle');
-  title.textContent = won ? 'WIN' : 'LOSE';
+  const won = winnerId === myId;
+  title.textContent = won ? 'YOU WIN' : (nameOf(winnerId) + ' WINS');
   title.className = 'end-title ' + (won ? 'win' : 'lose');
-  document.getElementById('endScore').textContent = `${myScore} - ${enemyScore}`;
+  document.getElementById('btnRestart').style.display = isHost ? 'block' : 'none';
+  renderScoreboard();
   overlay.style.display = 'flex';
 }
 
-function requestRematch() {
-  myScore = 0; enemyScore = 0; hp = 100;
-  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+function doRestartLocal() {
+  scoreboard.forEach(v => v.score = 0);
   pointBannerShown = false;
   document.getElementById('matchEndOverlay').style.display = 'none';
   isGameActive = true;
-  sendData({ type: 'rematch' });
-  resetGame();
+  respawnSelf();
+  renderScoreboard();
 }
 
-function resetGame() {
-  hp = 100;
-  myX = isHost ? -25 : 25; myZ = isHost ? -25 : 25; myY = 1.6;
-  yaw = isHost ? Math.PI / 4 : -Math.PI * 0.75; pitch = 0;
-  recoilPitch = 0; recoilYaw = 0;
-  camera.rotation.set(0, yaw, 0, 'YXZ');
-  remoteBody.material.color.setHex(isHost ? 0x0088ff : 0xff4655);
+function hostRestart() {
+  if (!isHost) return;
+  doRestartLocal();
+  broadcast({ type: 'restart' }, null);
 }
 
 function animate() {
@@ -1234,6 +1529,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+document.getElementById('btnRestart').style.display = 'none';
 initPeer();
 animate();
 </script>
