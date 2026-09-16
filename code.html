@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYBER STRIKE: VALORANT FPS (v3)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: #02040a; font-family: 'Segoe UI', sans-serif; color: #fff; user-select: none; }
+
+    #gameCanvas { width: 100vw; height: 100vh; display: block; }
+
+    /* ロビーUI */
+    #lobbyModal {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(5, 8, 16, 0.95); backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .card {
+      background: #0d1322; border: 1px solid #ff4655;
+      box-shadow: 0 0 30px rgba(255, 70, 85, 0.25); border-radius: 16px; padding: 28px;
+      text-align: center; max-width: 440px; width: 90%;
+    }
+    h1 { font-size: 32px; color: #ff4655; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #00ffcc; margin-bottom: 20px; letter-spacing: 1px; font-weight: bold; }
+
+    .btn {
+      background: #ff4655; color: #fff; font-weight: 800; border: none;
+      padding: 12px 20px; border-radius: 6px; font-size: 14px; cursor: pointer;
+      width: 100%; margin: 6px 0; transition: all 0.15s ease;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .btn:hover { background: #ff5f6d; transform: translateY(-1px); }
+    .btn:disabled { background: #444; cursor: not-allowed; opacity: 0.6; }
+    .btn-sec { background: #1a233a; color: #fff; border: 1px solid #334466; }
+    .btn-sec:hover { background: #253252; }
+
+    .input-group { display: flex; gap: 8px; margin-top: 8px; }
+    input[type="text"] {
+      flex: 1; background: #060913; border: 1px solid #334466; border-radius: 6px;
+      padding: 10px; color: #fff; font-size: 18px; text-align: center; outline: none; font-weight: bold;
+      letter-spacing: 3px; text-transform: uppercase;
+    }
+    input[type="text"]:focus { border-color: #ff4655; }
+
+    #qrContainer {
+      margin: 14px auto; padding: 12px; background: #fff; border-radius: 12px; display: inline-block;
+      min-width: 180px; min-height: 180px;
+    }
+    .room-code-big {
+      font-size: 40px; font-weight: 900; letter-spacing: 8px; color: #fff;
+      margin: 6px 0; font-family: 'Consolas', monospace;
+    }
+    .err-text { font-size: 12px; color: #ff8a94; margin-top: 8px; min-height: 14px; }
+    .manual-link { color: #88a0c0; font-size: 11px; text-decoration: underline; cursor: pointer; }
+    .manual-link:hover { color: #fff; }
+
+    .spinner {
+      width: 46px; height: 46px; border-radius: 50%; margin: 6px auto 0;
+      border: 4px solid #1a233a; border-top-color: #ff4655;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #scannerModal {
+      display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.92); z-index: 150; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #reader { width: 300px; max-width: 85vw; border-radius: 12px; overflow: hidden; border: 2px solid #ff4655; background: #000; }
+
+    /* HUD */
+    #hud { display: none; pointer-events: none; }
+
+    .crosshair-container {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1);
+      width: 40px; height: 40px; pointer-events: none; transition: transform 0.06s linear;
+    }
+    .ch-dot { position: absolute; top: 19px; left: 19px; width: 2px; height: 2px; background: #00ffcc; }
+    .ch-line { position: absolute; background: #00ffcc; }
+    .ch-top { top: 8px; left: 19px; width: 2px; height: 6px; }
+    .ch-bottom { bottom: 8px; left: 19px; width: 2px; height: 6px; }
+    .ch-left { top: 19px; left: 8px; width: 6px; height: 2px; }
+    .ch-right { top: 19px; right: 8px; width: 6px; height: 2px; }
+
+    #hitmarker {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);
+      width: 24px; height: 24px; opacity: 0; transition: opacity 0.05s ease-out; pointer-events: none;
+    }
+    #hitmarker::before, #hitmarker::after { content:''; position: absolute; background: #ff4655; }
+    #hitmarker::before { top: 0; left: 10px; width: 4px; height: 24px; }
+    #hitmarker::after { top: 10px; left: 0; width: 24px; height: 4px; }
+
+    .status-panel {
+      position: absolute; bottom: 24px; left: 28px;
+      background: rgba(13, 19, 34, 0.85); border-left: 4px solid #00ffcc;
+      padding: 12px 20px; border-radius: 4px;
+    }
+    .hp-bar-bg { width: 180px; height: 8px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .hp-bar-fill { height: 100%; width: 100%; background: #00ffcc; transition: width 0.1s ease-out; }
+    #sneakTag { font-size: 11px; color: #ffcc00; font-weight: 900; margin-left: 8px; opacity: 0; transition: opacity 0.15s; }
+    #dashTag { font-size: 11px; font-weight: 900; margin-top: 4px; color: #667a9a; }
+    #dashTag.ready { color: #00ffcc; }
+
+    .ammo-panel {
+      position: absolute; bottom: 24px; right: 28px;
+      background: rgba(13, 19, 34, 0.85); border-right: 4px solid #ff4655;
+      padding: 12px 20px; border-radius: 4px; text-align: right;
+    }
+    .ammo-count { font-size: 36px; font-weight: 900; color: #fff; font-style: italic; }
+    #weaponHint { font-size: 10px; color: #556688; margin-top: 4px; }
+
+    #lockPrompt {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(13, 19, 34, 0.95); padding: 28px 48px; border-radius: 12px; border: 2px solid #ff4655;
+      text-align: center; font-size: 22px; font-weight: 900; color: #fff; cursor: pointer; pointer-events: auto;
+      z-index: 50; display: block;
+    }
+
+    #hurtFlash {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle, transparent 20%, rgba(255, 70, 85, 0.6) 100%);
+      opacity: 0; transition: opacity 0.08s; pointer-events: none;
+    }
+
+    .dmg-popup {
+      position: absolute; font-weight: 900; font-size: 24px; color: #ffcc00;
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 0 0 8px #ffaa00; pointer-events: none;
+      animation: floatUp 0.5s ease-out forwards;
+    }
+    .dmg-popup.hs { font-size: 34px; color: #ff4655; text-shadow: 0 0 12px #ff4655; }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -40px) scale(0.8); }
+    }
+
+    #killBanner, #pointBanner {
+      position: absolute; left: 50%; transform: translate(-50%, -50%) scale(0.7);
+      font-size: 44px; font-weight: 900; letter-spacing: 4px;
+      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 4px #000; opacity: 0; pointer-events: none;
+      transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    }
+    #killBanner { top: 30%; color: #ff4655; text-shadow: 0 0 20px rgba(255,70,85,0.9), 0 0 4px #000; }
+    #pointBanner { top: 16%; color: #ffcc00; font-size: 28px; text-shadow: 0 0 16px rgba(255,204,0,0.8), 0 0 4px #000; }
+    #killBanner.show, #pointBanner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    #radar {
+      position: absolute; top: 24px; right: 28px; width: 120px; height: 120px;
+      background: rgba(13, 19, 34, 0.85); border: 1px solid #334466; border-radius: 8px;
+      overflow: hidden;
+    }
+    .radar-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); }
+    #radarSelf { background: #00ffcc; box-shadow: 0 0 6px #00ffcc; }
+    #radarEnemy { background: #ff4655; box-shadow: 0 0 6px #ff4655; }
+
+    #matchEndOverlay, #disconnectOverlay {
+      display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(2,4,10,0.92); z-index: 200; align-items: center; justify-content: center;
+    }
+    .end-title { font-size: 46px; font-weight: 900; letter-spacing: 4px; margin-bottom: 6px; }
+    .end-title.win { color: #00ffcc; text-shadow: 0 0 20px rgba(0,255,204,0.6); }
+    .end-title.lose { color: #ff4655; text-shadow: 0 0 20px rgba(255,70,85,0.6); }
+
+    @media (max-width: 480px) {
+      #radar { display: none; }
+    }
+  </style>
+
+  <!-- External Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="hurtFlash"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="crosshair-container" id="crosshair">
+    <div class="ch-dot"></div>
+    <div class="ch-line ch-top"></div>
+    <div class="ch-line ch-bottom"></div>
+    <div class="ch-line ch-left"></div>
+    <div class="ch-line ch-right"></div>
+    <div id="hitmarker"></div>
+  </div>
+
+  <div id="killBanner">ELIMINATED</div>
+  <div id="pointBanner">MATCH POINT</div>
+
+  <div id="radar">
+    <div class="radar-dot" id="radarSelf" style="left:60px; top:60px;"></div>
+    <div class="radar-dot" id="radarEnemy" style="left:60px; top:60px; display:none;"></div>
+  </div>
+
+  <div class="status-panel">
+    <div style="font-size:11px; color:#88a0c0; font-weight:800;">AGENT STATUS</div>
+    <div style="font-size:15px; font-weight:900; margin-top:2px;">
+      <span id="myRole" style="color:#00ffcc;">-</span> | SCORE: <span id="scoreText" style="color:#fff;">0 - 0</span>
+      <span id="sneakTag">SNEAK</span>
+    </div>
+    <div class="hp-bar-bg"><div id="hpFill" class="hp-bar-fill"></div></div>
+    <div id="dashTag">DASH READY</div>
+  </div>
+
+  <div class="ammo-panel">
+    <div style="font-size:12px; color:#ff4655; font-weight:900;" id="weaponName">VANDAL</div>
+    <div class="ammo-count"><span id="ammoText">25</span><span id="ammoMax" style="font-size:16px; color:#667a9a;">/25</span></div>
+    <div id="weaponHint">[1] VANDAL　[2] SIDEARM</div>
+  </div>
+
+  <div id="lockPrompt">
+    CLICK TO PLAY
+    <div style="font-size:13px; color:#88a0c0; margin-top:8px; font-weight:normal;">
+      [WASD] 移動 | [C] 静音歩き切替 | [Space] ジャンプ | [Q] ダッシュ<br>
+      [右クリック] ADS | [左クリック] 射撃 | [R] リロード | [1/2] 武器切替
+    </div>
+    <div style="font-size:11px; color:#556688; margin-top:10px;">※画面がズレたら、ここをクリックして視点を再ロックしてください</div>
+  </div>
+</div>
+
+<div id="matchEndOverlay">
+  <div class="card">
+    <div class="end-title" id="endTitle">WIN</div>
+    <div style="color:#aaa; font-size:13px; margin-bottom:16px;">SCORE: <span id="endScore">5 - 2</span></div>
+    <button class="btn" onclick="requestRematch()">もう一度対戦する</button>
+    <button class="btn btn-sec" onclick="location.reload()">ロビーに戻る</button>
+  </div>
+</div>
+
+<div id="disconnectOverlay">
+  <div class="card">
+    <div class="end-title lose" style="font-size:28px;">接続が切断されました</div>
+    <p style="color:#aaa; font-size:13px; margin:10px 0 16px;">相手との通信が切れました。ロビーに戻ってやり直してください。</p>
+    <button class="btn" onclick="location.reload()">ロビーに戻る</button>
+  </div>
+</div>
+
+<!-- QR Camera Modal -->
+<div id="scannerModal">
+  <div class="card">
+    <h2 style="color:#ff4655; margin-bottom:8px; font-size:20px;">QRスキャン</h2>
+    <div id="reader"></div>
+    <div class="err-text" id="scanErr"></div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-sec" style="flex:1;" onclick="switchCamera()">🔄 カメラ切替</button>
+      <button class="btn btn-sec" style="flex:1;" onclick="stopScanner()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lobby Modal -->
+<div id="lobbyModal">
+  <div class="card" id="mainMenu">
+    <h1>CYBER STRIKE</h1>
+    <div class="subtitle" id="netStatus">CONNECTING TO NETWORK...</div>
+
+    <button class="btn" id="btnAutoMatch" disabled onclick="startAutoMatch()">対戦相手を自動で探す</button>
+
+    <div style="margin: 14px 0 4px;">
+      <span class="manual-link" id="toggleManual" onclick="toggleManualPanel()">友達をコードで招待する ▾</span>
+    </div>
+
+    <div id="manualPanel" style="display:none; margin-top:10px;">
+      <button class="btn btn-sec" id="btnHost" disabled onclick="hostGame()">ホストとしてルーム作成</button>
+      <button class="btn btn-sec" id="btnScan" disabled onclick="startScanner()">📷 カメラでQRスキャン参加</button>
+      <div style="margin: 12px 0; color: #556688; font-size:11px; font-weight:bold;">- OR JOIN WITH ROOM CODE -</div>
+      <div class="input-group">
+        <input type="text" id="roomIdInput" placeholder="CODE" autocomplete="off" spellcheck="false" maxlength="6">
+        <button class="btn" id="btnJoin" disabled style="width: auto; padding: 10px 16px;" onclick="joinGame()">参加</button>
+      </div>
+    </div>
+    <div class="err-text" id="lobbyErr"></div>
+  </div>
+
+  <div class="card" id="matchmakingMenu" style="display:none;">
+    <h1>MATCHMAKING</h1>
+    <div class="spinner"></div>
+    <div class="subtitle" id="matchStatus" style="margin-top:14px;">対戦相手を探しています…</div>
+    <button class="btn btn-sec" style="margin-top:16px;" onclick="cancelMatchmaking()">キャンセル</button>
+  </div>
+
+  <div class="card" id="hostMenu" style="display:none;">
+    <h1>ROOM HOST</h1>
+    <p style="font-size:12px; color:#aaa; margin-bottom:8px;">相手のカメラでQRコードをスキャンするか、下の短いコードを伝えてください</p>
+    <div id="qrContainer"></div>
+    <div class="room-code-big" id="displayRoomId">------</div>
+    <button class="btn btn-sec" style="margin-top:10px;" onclick="copyRoomId()">コードをコピー</button>
+    <button class="btn btn-sec" onclick="location.reload()">キャンセル</button>
+    <div class="err-text" id="hostErr"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 0. 定数
+// ==========================================
+const SCORE_LIMIT = 5;
+const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 紛らわしい 0/O/1/I/L は除外
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+// 自動マッチメイキング用の共有ロビースロット（サーバーを持たないため、
+// 決まった名前のスロットを順番に探す/使うことで擬似的な自動マッチングを実現している）
+const LOBBY_SLOTS = ['CS-ARENA-1','CS-ARENA-2','CS-ARENA-3','CS-ARENA-4','CS-ARENA-5','CS-ARENA-6'];
+
+const WEAPONS = {
+  vandal:  { key: '1', name: 'VANDAL',  mag: 25, dmgBody: 28, dmgHead: 105, cooldown: 8, reloadFrames: 50 },
+  sidearm: { key: '2', name: 'SIDEARM', mag: 12, dmgBody: 16, dmgHead: 60,  cooldown: 5, reloadFrames: 30 }
+};
+
+function generateRoomCode() {
+  let code = "";
+  for (let i = 0; i < 6; i++) code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
+  return code;
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ==========================================
+// 1. Web Audio Engine
+// ==========================================
+class SoundEngine {
+  constructor() { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+  ensureCtx() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
+
+  playShoot() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'square'; osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.09);
+    gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.09);
+  }
+
+  playBodyHit() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(700, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+    gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.08);
+  }
+
+  playHeadshot() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(2600, now);
+    osc.frequency.exponentialRampToValueAtTime(1400, now + 0.2);
+    gain.gain.setValueAtTime(0.7, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.2);
+  }
+
+  playKill() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(550, now + 0.22);
+    gain.gain.setValueAtTime(0.6, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.22);
+  }
+
+  playStep() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.05);
+    gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.05);
+  }
+
+  playReload() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'square'; osc.frequency.setValueAtTime(200, now);
+    gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.06);
+  }
+
+  playDash() {
+    this.ensureCtx(); const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.15);
+    gain.gain.setValueAtTime(0.25, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc.connect(gain); gain.connect(this.ctx.destination);
+    osc.start(now); osc.stop(now + 0.15);
+  }
+}
+const audio = new SoundEngine();
+
+// ==========================================
+// 2. Network & PeerJS
+// ==========================================
+let peer = null, conn = null;
+let isHost = false, isConnected = false, isGameActive = false;
+let myScore = 0, enemyScore = 0;
+let html5QrCode = null, currentFacingMode = "environment";
+let myRoomCode = "";
+let peerInitAttempts = 0;
+let currentSlotResolver = null; // 自動マッチング中の「今試している1件」を解決するための一時コールバック
+let matchmakingActive = false;
+
+function setLobbyError(msg) { document.getElementById('lobbyErr').textContent = msg || ""; }
+function setMatchStatus(msg) { document.getElementById('matchStatus').textContent = msg; }
+
+function attachPeerHandlers(p) {
+  p.on('connection', c => {
+    if (conn && isConnected) { try { c.close(); } catch (e) {} return; } // 満室なら追加接続を拒否
+    conn = c;
+    setupConnection();
+  });
+
+  p.on('error', err => {
+    console.error("Peer Error:", err);
+    // 自動マッチング中の接続試行が失敗した場合はそちらを優先して処理
+    if (currentSlotResolver && (err.type === 'peer-unavailable' || err.type === 'unavailable-id')) {
+      const r = currentSlotResolver; currentSlotResolver = null; r(false); return;
+    }
+    if (err.type === 'unavailable-id') {
+      peerInitAttempts++;
+      if (peerInitAttempts < 5) { p.destroy(); initPeer(); return; }
+      setLobbyError('部屋の作成に失敗しました。ページを再読み込みしてください。');
+    } else if (err.type === 'peer-unavailable') {
+      setLobbyError('そのルームコードが見つかりません。もう一度確認してください。');
+      document.getElementById('scanErr').textContent = 'そのコードのルームが見つかりません。';
+    } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+      setLobbyError('通信サーバーへの接続に問題があります。回線を確認して再読み込みしてください。');
+    } else {
+      setLobbyError('通信エラーが発生しました: ' + err.type);
+    }
+  });
+}
+
+function initPeer() {
+  myRoomCode = generateRoomCode();
+  peer = new Peer(myRoomCode, { config: ICE_CONFIG });
+
+  peer.on('open', id => {
+    myRoomCode = id;
+    document.getElementById('netStatus').textContent = "ONLINE - READY";
+    document.getElementById('netStatus').style.color = "#00ffcc";
+    document.getElementById('btnAutoMatch').disabled = false;
+    document.getElementById('btnHost').disabled = false;
+    document.getElementById('btnScan').disabled = false;
+    document.getElementById('btnJoin').disabled = false;
+  });
+
+  attachPeerHandlers(peer);
+}
+
+function toggleManualPanel() {
+  const panel = document.getElementById('manualPanel');
+  const link = document.getElementById('toggleManual');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  link.textContent = opening ? '友達をコードで招待する ▴' : '友達をコードで招待する ▾';
+}
+
+function hostGame() {
+  if (!peer || !peer.id) return setLobbyError('サーバー初期化中です。少し待って再試行してください。');
+  isHost = true;
+  document.getElementById('mainMenu').style.display = 'none';
+  document.getElementById('hostMenu').style.display = 'block';
+  document.getElementById('displayRoomId').textContent = myRoomCode;
+
+  const container = document.getElementById('qrContainer');
+  container.innerHTML = '';
+  new QRCode(container, { text: myRoomCode, width: 180, height: 180 });
+}
+
+function joinGame(targetRoomId) {
+  const targetId = (targetRoomId || document.getElementById('roomIdInput').value.trim()).toUpperCase();
+  if (!targetId) { setLobbyError('ルームコードを入力してください'); return; }
+  setLobbyError("");
+  isHost = false;
+  conn = peer.connect(targetId, { reliable: true });
+  setupConnection();
+}
+
+function copyRoomId() {
+  navigator.clipboard.writeText(myRoomCode);
+  const btn = event.target;
+  const old = btn.textContent; btn.textContent = 'コピーしました！';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+
+// --- 自動マッチメイキング ---
+// サーバーを持たない構成なので、決まった名前のロビースロットを
+// ①まず「誰かが既にホストしていないか」順番に接続を試み(=空いている試合を探す)、
+// ②誰も見つからなければ自分がそのスロット名でホストになって待つ、という方式で成立させている。
+async function startAutoMatch() {
+  if (matchmakingActive) return;
+  matchmakingActive = true;
+  document.getElementById('mainMenu').style.display = 'none';
+  document.getElementById('matchmakingMenu').style.display = 'block';
+  setMatchStatus('対戦相手を探しています…');
+
+  const order = shuffle(LOBBY_SLOTS);
+
+  for (const slot of order) {
+    if (!matchmakingActive) return;
+    setMatchStatus(`部屋を確認中… (${slot})`);
+    const found = await tryJoinSlot(slot);
+    if (found) { matchmakingActive = false; return; }
+  }
+
+  if (!matchmakingActive) return;
+  await becomeHostOnFreeSlot(order);
+}
+
+function tryJoinSlot(slotId) {
+  return new Promise(resolve => {
+    if (!peer || peer.destroyed) { resolve(false); return; }
+    let settled = false;
+    currentSlotResolver = (ok) => { if (settled) return; settled = true; resolve(ok); };
+
+    let testConn;
+    try {
+      testConn = peer.connect(slotId, { reliable: true });
+    } catch (e) { currentSlotResolver = null; resolve(false); return; }
+
+    const timer = setTimeout(() => {
+      if (settled) return; settled = true; currentSlotResolver = null;
+      try { testConn.close(); } catch (e) {}
+      resolve(false);
+    }, 2200);
+
+    testConn.on('open', () => {
+      if (settled) return; settled = true; currentSlotResolver = null;
+      clearTimeout(timer);
+      isHost = false;
+      conn = testConn;
+      setupConnection();
+      resolve(true);
+    });
+  });
+}
+
+async function becomeHostOnFreeSlot(order) {
+  for (const slot of order) {
+    if (!matchmakingActive) return;
+    setMatchStatus(`部屋を作成中… (${slot})`);
+    const ok = await tryHostSlot(slot);
+    if (ok) { matchmakingActive = false; return; }
+  }
+  setMatchStatus('部屋を作れませんでした。回線を確認して再試行してください。');
+  matchmakingActive = false;
+}
+
+function tryHostSlot(slotId) {
+  return new Promise(resolve => {
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    let settled = false;
+    const p = new Peer(slotId, { config: ICE_CONFIG });
+    peer = p;
+
+    p.on('open', id => {
+      if (settled) return; settled = true;
+      isHost = true; myRoomCode = id;
+      setMatchStatus('対戦相手を待っています…');
+      resolve(true);
+    });
+    p.on('error', err => {
+      if (settled) return; settled = true;
+      resolve(false);
+    });
+    attachPeerHandlers(p);
+  });
+}
+
+function cancelMatchmaking() {
+  matchmakingActive = false;
+  currentSlotResolver = null;
+  document.getElementById('matchmakingMenu').style.display = 'none';
+  document.getElementById('mainMenu').style.display = 'block';
+  peerInitAttempts = 0;
+  if (peer) { try { peer.destroy(); } catch (e) {} }
+  initPeer();
+}
+
+// --- QR スキャン ---
+async function startScanner() {
+  document.getElementById('scannerModal').style.display = 'flex';
+  document.getElementById('scanErr').textContent = '';
+  if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+  currentFacingMode = "environment";
+  await runScanner();
+}
+
+async function runScanner() {
+  const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+  const onSuccess = (text) => { stopScanner(); joinGame(text.trim()); };
+  const onErr = () => {};
+
+  try {
+    await html5QrCode.start({ facingMode: { exact: currentFacingMode } }, config, onSuccess, onErr);
+  } catch (e1) {
+    try {
+      await html5QrCode.start({ facingMode: currentFacingMode }, config, onSuccess, onErr);
+    } catch (e2) {
+      try {
+        currentFacingMode = "user";
+        await html5QrCode.start({ facingMode: "user" }, config, onSuccess, onErr);
+      } catch (e3) {
+        document.getElementById('scanErr').textContent = 'カメラを起動できませんでした。ブラウザのカメラ権限を確認するか、コード入力で参加してください。';
+      }
+    }
+  }
+}
+
+async function switchCamera() {
+  if (!html5QrCode) return;
+  try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch (e) {}
+  currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+  await runScanner();
+}
+
+function stopScanner() {
+  if (html5QrCode && html5QrCode.isScanning) {
+    html5QrCode.stop().then(() => document.getElementById('scannerModal').style.display = 'none').catch(() => {
+      document.getElementById('scannerModal').style.display = 'none';
+    });
+  } else { document.getElementById('scannerModal').style.display = 'none'; }
+}
+
+function setupConnection() {
+  conn.on('open', () => {
+    isConnected = true; isGameActive = true;
+    document.getElementById('lobbyModal').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('myRole').textContent = isHost ? "HOST (RED)" : "GUEST (BLUE)";
+    resetGame();
+  });
+  conn.on('data', data => handleNetworkData(data));
+  conn.on('close', () => handleDisconnect());
+  conn.on('error', () => handleDisconnect());
+}
+
+function handleDisconnect() {
+  if (!isGameActive && !isConnected) return;
+  isGameActive = false; isConnected = false;
+  try { document.exitPointerLock(); } catch (e) {}
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('disconnectOverlay').style.display = 'flex';
+}
+
+function sendData(data) {
+  if (!conn || !isConnected) return;
+  try { conn.send(data); } catch (e) { /* 送信失敗は無視して次フレームへ */ }
+}
+
+// ==========================================
+// 3. Three.js Render & World
+// ==========================================
+const canvas = document.getElementById('gameCanvas');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050810, 0.018);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+const dirLight = new THREE.DirectionalLight(0xff4655, 0.8);
+dirLight.position.set(20, 40, 20); scene.add(dirLight);
+
+const obstacles = [];
+const worldMeshes = []; // 弾のあたり判定はこのリストだけを対象にする（自分の銃・カメラは含めない）
+
+function buildMap() {
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.MeshStandardMaterial({ color: 0x0a0f1d, roughness: 0.5 })
+  );
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  worldMeshes.push(floor);
+
+  const grid = new THREE.GridHelper(100, 40, 0xff4655, 0x1a233a);
+  grid.position.y = 0.01; scene.add(grid);
+
+  addBlock(0, 2.5, 0, 12, 5, 12, 0xff4655);
+  addBlock(-18, 2, -18, 8, 4, 8, 0x00ffcc);
+  addBlock(18, 2, 18, 8, 4, 8, 0x0088ff);
+  addBlock(10, 1.5, -10, 6, 3, 6, 0xffaa00);
+  addBlock(-10, 1.5, 10, 6, 3, 6, 0x8855ff);
+}
+
+function addBlock(x, y, z, w, h, d, color) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.3 })
+  );
+  mesh.position.set(x, y, z); scene.add(mesh);
+  worldMeshes.push(mesh);
+  obstacles.push({ minX: x - w/2, maxX: x + w/2, minZ: z - d/2, maxZ: z + d/2, topY: y + h/2 });
+}
+buildMap();
+
+// Remote Player Model
+const remoteGroup = new THREE.Group();
+const remoteBody = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.6, 0.6, 1.4, 16),
+  new THREE.MeshStandardMaterial({ color: 0xff4655 })
+);
+remoteBody.position.y = 0.7; remoteGroup.add(remoteBody);
+
+const remoteHead = new THREE.Mesh(
+  new THREE.SphereGeometry(0.38, 16, 16),
+  new THREE.MeshStandardMaterial({ color: 0xffffff })
+);
+remoteHead.position.y = 1.6; remoteGroup.add(remoteHead);
+
+const hitboxGroup = new THREE.Group();
+const bodyHitbox = new THREE.Mesh(
+  new THREE.BoxGeometry(1.2, 1.4, 1.2),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+bodyHitbox.position.y = 0.7; bodyHitbox.userData = { type: 'body' };
+hitboxGroup.add(bodyHitbox);
+
+const headHitbox = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 12, 12),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+headHitbox.position.y = 1.6; headHitbox.userData = { type: 'head' };
+hitboxGroup.add(headHitbox);
+
+remoteGroup.add(hitboxGroup);
+scene.add(remoteGroup);
+
+let remoteTarget = { x: 0, y: 0, z: 0, yaw: 0, has: false };
+
+// Gun Mesh
+const gunGroup = new THREE.Group();
+const gunMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.1, 0.14, 0.6),
+  new THREE.MeshStandardMaterial({ color: 0x111622 })
+);
+gunGroup.add(gunMesh);
+
+const muzzleFlash = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.22, 0.22),
+  new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
+);
+muzzleFlash.position.set(0, 0, -0.33);
+muzzleFlash.visible = false;
+gunGroup.add(muzzleFlash);
+
+const muzzleLight = new THREE.PointLight(0xffcc66, 0, 4);
+muzzleLight.position.set(0, 0, -0.3);
+gunGroup.add(muzzleLight);
+
+gunGroup.position.set(0.2, -0.2, -0.4);
+camera.add(gunGroup); scene.add(camera);
+
+const particles = [];
+function createSparks(pos, color = 0x00ffcc, count = 8) {
+  for (let i = 0; i < count; i++) {
+    const p = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.05, 0.05),
+      new THREE.MeshBasicMaterial({ color })
+    );
+    p.position.copy(pos);
+    const vel = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.3,
+      (Math.random() - 0.5) * 0.3 + 0.1,
+      (Math.random() - 0.5) * 0.3
+    );
+    scene.add(p);
+    particles.push({ mesh: p, vel, life: 1.0 });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.mesh.position.add(p.vel);
+    p.life -= 0.08;
+    if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+  }
+}
+
+function spawnDamagePopup(val, point, isHeadshot) {
+  const div = document.createElement('div');
+  div.className = `dmg-popup ${isHeadshot ? 'hs' : ''}`;
+  div.textContent = isHeadshot ? `HS ${val}!` : `-${val}`;
+  document.body.appendChild(div);
+
+  const screenPos = point.clone().project(camera);
+  const x = (screenPos.x * .5 + .5) * window.innerWidth;
+  const y = (-(screenPos.y * .5) + .5) * window.innerHeight;
+  div.style.left = `${x}px`; div.style.top = `${y}px`;
+  setTimeout(() => div.remove(), 500);
+}
+
+function showKillBanner() {
+  const el = document.getElementById('killBanner');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 700);
+}
+
+let pointBannerShown = false;
+function showPointBannerIfNeeded() {
+  if (pointBannerShown) return;
+  if (myScore === SCORE_LIMIT - 1 || enemyScore === SCORE_LIMIT - 1) {
+    pointBannerShown = true;
+    const el = document.getElementById('pointBanner');
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1200);
+  }
+}
+
+// ==========================================
+// 4. Input & Control
+// ==========================================
+let myX = 0, myY = 1.6, myZ = 0, myVy = 0;
+let yaw = 0, pitch = 0;
+let recoilPitch = 0, recoilYaw = 0;
+let mouseDeltaX = 0, mouseDeltaY = 0;
+let hp = 100;
+let currentWeaponKey = 'vandal';
+let ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+let isGrounded = false, isADS = false, cooldown = 0, reloadTimer = 0;
+let screenShake = 0;
+let sneakMode = false;
+let muzzleTimer = 0;
+let hitStopFrames = 0;
+let lastSyncTime = 0;
+let stepAccum = 0;
+
+const DASH_COOLDOWN = 90, DASH_DURATION = 10, DASH_SPEED = 0.35;
+let dashCooldownTimer = 0, dashBoostTimer = 0;
+
+const keys = {};
+
+window.addEventListener('keydown', e => {
+  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyR', 'KeyC', 'KeyQ', 'Digit1', 'Digit2'].includes(e.code)) {
+    if (document.pointerLockElement) e.preventDefault();
+  }
+  if (e.code === 'KeyC' && !keys['KeyC']) sneakMode = !sneakMode;
+  if (e.code === 'KeyQ' && !keys['KeyQ']) tryDash();
+  if (e.code === 'Digit1') switchWeapon('vandal');
+  if (e.code === 'Digit2') switchWeapon('sidearm');
+  keys[e.code] = true;
+  if (e.code === 'KeyR') tryReload();
+});
+
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement) {
+    mouseDeltaX += e.movementX;
+    mouseDeltaY += e.movementY;
+  }
+});
+
+document.addEventListener('pointerlockchange', () => {
+  const lockPromptEl = document.getElementById('lockPrompt');
+  if (document.pointerLockElement === canvas) {
+    lockPromptEl.style.display = 'none';
+    if (document.activeElement) document.activeElement.blur();
+  } else {
+    lockPromptEl.style.display = 'block';
+    for (const k in keys) keys[k] = false;
+    mouseDeltaX = 0; mouseDeltaY = 0;
+    isADS = false;
+  }
+});
+
+const lockPrompt = document.getElementById('lockPrompt');
+lockPrompt.addEventListener('click', () => {
+  if (document.activeElement) document.activeElement.blur();
+  canvas.requestPointerLock();
+});
+
+window.addEventListener('mousedown', e => {
+  if (document.pointerLockElement) {
+    if (e.button === 0) shoot();
+    if (e.button === 2) isADS = true;
+  }
+});
+window.addEventListener('mouseup', e => { if (e.button === 2) isADS = false; });
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+function switchWeapon(key) {
+  if (currentWeaponKey === key) return;
+  currentWeaponKey = key;
+  reloadTimer = 0;
+}
+
+function tryReload() {
+  const w = WEAPONS[currentWeaponKey];
+  if (ammoByWeapon[currentWeaponKey] < w.mag && reloadTimer === 0) {
+    reloadTimer = w.reloadFrames;
+    audio.playReload();
+  }
+}
+
+function tryDash() {
+  if (!isGameActive || dashCooldownTimer > 0) return;
+  if (document.pointerLockElement !== canvas) return;
+  dashBoostTimer = DASH_DURATION;
+  dashCooldownTimer = DASH_COOLDOWN;
+  screenShake = Math.max(screenShake, 0.05);
+  audio.playDash();
+}
+
+function shoot() {
+  const w = WEAPONS[currentWeaponKey];
+  if (cooldown > 0 || reloadTimer > 0) return;
+  if (ammoByWeapon[currentWeaponKey] <= 0) { reloadTimer = w.reloadFrames; audio.playReload(); return; }
+
+  ammoByWeapon[currentWeaponKey]--; cooldown = w.cooldown;
+  audio.playShoot();
+  gunGroup.position.z += 0.12;
+
+  recoilPitch += 0.03;
+  recoilYaw += (Math.random() - 0.5) * 0.015;
+  screenShake = Math.max(screenShake, 0.04);
+
+  muzzleFlash.visible = true;
+  muzzleLight.intensity = 3.5;
+  muzzleTimer = 4;
+
+  const raycaster = new THREE.Raycaster();
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  raycaster.set(camera.position, dir);
+
+  const endPoint = camera.position.clone().add(dir.clone().multiplyScalar(50));
+  const tracer = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([camera.position, endPoint]),
+    new THREE.LineBasicMaterial({ color: 0xff4655 })
+  );
+  scene.add(tracer); setTimeout(() => scene.remove(tracer), 20);
+
+  const intersects = raycaster.intersectObjects([...hitboxGroup.children, ...worldMeshes], false);
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    if (hit.object.parent === hitboxGroup) {
+      const isHead = hit.object.userData.type === 'head';
+      const dmg = isHead ? w.dmgHead : w.dmgBody;
+
+      sendData({ type: 'hit', damage: dmg, point: hit.point, isHeadshot: isHead });
+      showHitmarker();
+
+      if (isHead) { audio.playHeadshot(); createSparks(hit.point, 0xffcc00, 15); }
+      else { audio.playBodyHit(); createSparks(hit.point, 0xff4655, 8); }
+      spawnDamagePopup(dmg, hit.point, isHead);
+    } else {
+      createSparks(hit.point, 0x00ffcc, 4);
+    }
+  }
+}
+
+function showHitmarker() {
+  const hm = document.getElementById('hitmarker');
+  hm.style.opacity = '1'; setTimeout(() => hm.style.opacity = '0', 60);
+}
+
+// ==========================================
+// 5. Physics & Frame Loop
+// ==========================================
+function updatePhysics() {
+  if (!isConnected || !isGameActive) return;
+
+  recoilPitch *= 0.85;
+  recoilYaw *= 0.85;
+
+  if (muzzleTimer > 0) {
+    muzzleTimer--;
+    if (muzzleTimer === 0) { muzzleFlash.visible = false; }
+  }
+  muzzleLight.intensity *= 0.6;
+
+  if (dashCooldownTimer > 0) dashCooldownTimer--;
+
+  updateParticles();
+  updateRadar();
+  updateDashTag();
+
+  if (hitStopFrames > 0) {
+    hitStopFrames--;
+    camera.rotation.set(pitch + recoilPitch, yaw + recoilYaw, camera.rotation.z, 'YXZ');
+    return;
+  }
+
+  const locked = document.pointerLockElement === canvas;
+
+  if (locked) {
+    if (mouseDeltaX !== 0 || mouseDeltaY !== 0) {
+      const sens = isADS ? 0.0012 : 0.0022;
+      yaw -= mouseDeltaX * sens;
+      pitch -= mouseDeltaY * sens;
+
+      const maxPitch = Math.PI / 2 - 0.02;
+      pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+
+      mouseDeltaX = 0;
+      mouseDeltaY = 0;
+    }
+
+    let moveX = 0, moveZ = 0;
+    if (keys['KeyW']) moveZ -= 1;
+    if (keys['KeyS']) moveZ += 1;
+    if (keys['KeyA']) moveX -= 1;
+    if (keys['KeyD']) moveX += 1;
+
+    const speed = sneakMode ? 0.07 : 0.15;
+    const isMoving = (moveX !== 0 || moveZ !== 0);
+
+    if (isMoving) {
+      const len = Math.hypot(moveX, moveZ);
+      moveX /= len; moveZ /= len;
+
+      const cosY = Math.cos(yaw);
+      const sinY = Math.sin(yaw);
+
+      const vx = (moveX * cosY + moveZ * sinY) * speed;
+      const vz = (-moveX * sinY + moveZ * cosY) * speed;
+
+      if (!checkCollision(myX + vx, myZ)) myX += vx;
+      if (!checkCollision(myX, myZ + vz)) myZ += vz;
+
+      if (isGrounded && !sneakMode) {
+        stepAccum += speed;
+        if (stepAccum > 1.1) { stepAccum = 0; audio.playStep(); }
+      }
+    }
+
+    // ダッシュ（常に現在の向いている方向へ突進。押しっぱなしのWASD状態に依存しない独立処理）
+    if (dashBoostTimer > 0) {
+      dashBoostTimer--;
+      const dvx = -Math.sin(yaw) * DASH_SPEED;
+      const dvz = -Math.cos(yaw) * DASH_SPEED;
+      if (!checkCollision(myX + dvx, myZ)) myX += dvx;
+      if (!checkCollision(myX, myZ + dvz)) myZ += dvz;
+    }
+
+    myVy -= 0.012; myY += myVy;
+
+    let floorY = 0;
+    obstacles.forEach(o => {
+      if (myX > o.minX && myX < o.maxX && myZ > o.minZ && myZ < o.maxZ) {
+        if (myY >= o.topY + 1.6) floorY = o.topY;
+      }
+    });
+
+    if (myY <= floorY + 1.6) {
+      myY = floorY + 1.6; myVy = 0; isGrounded = true;
+    } else {
+      isGrounded = false;
+    }
+
+    if (keys['Space'] && isGrounded) {
+      myVy = 0.24; isGrounded = false; keys['Space'] = false;
+    }
+
+    myX = Math.max(-48, Math.min(48, myX));
+    myZ = Math.max(-48, Math.min(48, myZ));
+
+    camera.position.set(myX, myY, myZ);
+
+    if (screenShake > 0) {
+      camera.rotation.z = (Math.random() - 0.5) * screenShake;
+      screenShake *= 0.8;
+    } else { camera.rotation.z = 0; }
+
+    gunGroup.position.lerp(isADS ? new THREE.Vector3(0, -0.12, -0.3) : new THREE.Vector3(0.2, -0.2, -0.4), 0.2);
+    camera.fov = THREE.MathUtils.lerp(camera.fov, isADS ? 50 : 75, 0.2);
+    camera.updateProjectionMatrix();
+
+    if (cooldown > 0) cooldown--;
+    if (reloadTimer > 0) {
+      reloadTimer--;
+      if (reloadTimer === 0) ammoByWeapon[currentWeaponKey] = WEAPONS[currentWeaponKey].mag;
+    }
+
+    const now = performance.now();
+    if (now - lastSyncTime > 50) {
+      lastSyncTime = now;
+      sendData({ type: 'sync', x: myX, y: myY, z: myZ, yaw: yaw });
+    }
+
+    updateCrosshair(isMoving, isGrounded);
+  }
+
+  camera.rotation.set(pitch + recoilPitch, yaw + recoilYaw, camera.rotation.z, 'YXZ');
+
+  if (remoteTarget.has) {
+    remoteGroup.position.lerp(new THREE.Vector3(remoteTarget.x, remoteTarget.y - 1.6, remoteTarget.z), 0.35);
+    remoteGroup.rotation.y += (remoteTarget.yaw - remoteGroup.rotation.y) * 0.35;
+  }
+
+  const w = WEAPONS[currentWeaponKey];
+  document.getElementById('hpFill').style.width = `${Math.max(0, hp)}%`;
+  document.getElementById('ammoText').textContent = reloadTimer > 0 ? "..." : ammoByWeapon[currentWeaponKey];
+  document.getElementById('ammoMax').textContent = '/' + w.mag;
+  document.getElementById('weaponName').textContent = w.name;
+  document.getElementById('scoreText').textContent = `${myScore} - ${enemyScore}`;
+  document.getElementById('sneakTag').style.opacity = sneakMode ? '1' : '0';
+}
+
+function updateDashTag() {
+  const el = document.getElementById('dashTag');
+  if (dashCooldownTimer <= 0) { el.textContent = 'DASH READY'; el.classList.add('ready'); }
+  else { el.textContent = 'DASH ' + Math.ceil((1 - dashCooldownTimer / DASH_COOLDOWN) * 100) + '%'; el.classList.remove('ready'); }
+}
+
+function updateCrosshair(isMoving, grounded) {
+  let spread = 1.0;
+  if (isADS) spread = 0.6;
+  else {
+    if (isMoving) spread += sneakMode ? 0.05 : 0.35;
+    if (!grounded) spread += 0.4;
+  }
+  document.getElementById('crosshair').style.transform = `translate(-50%, -50%) scale(${spread})`;
+}
+
+function updateRadar() {
+  const selfEl = document.getElementById('radarSelf');
+  const enemyEl = document.getElementById('radarEnemy');
+  selfEl.style.left = '60px'; selfEl.style.top = '60px';
+  if (remoteTarget.has) {
+    const dx = remoteTarget.x - myX, dz = remoteTarget.z - myZ;
+    const rx = Math.max(6, Math.min(114, 60 + dx));
+    const ry = Math.max(6, Math.min(114, 60 + dz));
+    enemyEl.style.left = rx + 'px'; enemyEl.style.top = ry + 'px';
+    enemyEl.style.display = 'block';
+  }
+}
+
+function checkCollision(nx, nz) {
+  const r = 0.5;
+  for (let o of obstacles) {
+    if (nx + r > o.minX && nx - r < o.maxX && nz + r > o.minZ && nz - r < o.maxZ) {
+      if (myY < o.topY + 1.2) return true;
+    }
+  }
+  return false;
+}
+
+function handleNetworkData(data) {
+  if (data.type === 'sync') {
+    remoteTarget = { x: data.x, y: data.y, z: data.z, yaw: data.yaw, has: true };
+  } else if (data.type === 'hit') {
+    hp -= data.damage;
+    document.getElementById('hurtFlash').style.opacity = '1';
+    setTimeout(() => document.getElementById('hurtFlash').style.opacity = '0', 80);
+    screenShake = Math.max(screenShake, 0.08);
+
+    if (hp <= 0) {
+      enemyScore++;
+      sendData({ type: 'scored' });
+      showPointBannerIfNeeded();
+      if (enemyScore >= SCORE_LIMIT) { endMatch(false); return; }
+      resetGame();
+    }
+  } else if (data.type === 'scored') {
+    myScore++;
+    audio.playKill();
+    showKillBanner();
+    hitStopFrames = 6;
+    showPointBannerIfNeeded();
+    if (myScore >= SCORE_LIMIT) { endMatch(true); return; }
+    resetGame();
+  } else if (data.type === 'rematch') {
+    myScore = 0; enemyScore = 0; hp = 100;
+    ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+    pointBannerShown = false;
+    document.getElementById('matchEndOverlay').style.display = 'none';
+    isGameActive = true;
+    resetGame();
+  }
+}
+
+function endMatch(won) {
+  isGameActive = false;
+  try { document.exitPointerLock(); } catch (e) {}
+  const overlay = document.getElementById('matchEndOverlay');
+  const title = document.getElementById('endTitle');
+  title.textContent = won ? 'WIN' : 'LOSE';
+  title.className = 'end-title ' + (won ? 'win' : 'lose');
+  document.getElementById('endScore').textContent = `${myScore} - ${enemyScore}`;
+  overlay.style.display = 'flex';
+}
+
+function requestRematch() {
+  myScore = 0; enemyScore = 0; hp = 100;
+  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+  pointBannerShown = false;
+  document.getElementById('matchEndOverlay').style.display = 'none';
+  isGameActive = true;
+  sendData({ type: 'rematch' });
+  resetGame();
+}
+
+function resetGame() {
+  hp = 100;
+  myX = isHost ? -25 : 25; myZ = isHost ? -25 : 25; myY = 1.6;
+  yaw = isHost ? Math.PI / 4 : -Math.PI * 0.75; pitch = 0;
+  recoilPitch = 0; recoilYaw = 0;
+  camera.rotation.set(0, yaw, 0, 'YXZ');
+  remoteBody.material.color.setHex(isHost ? 0x0088ff : 0xff4655);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  updatePhysics();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+initPeer();
+animate();
+</script>
+</body>
+</html>
