@@ -57,6 +57,17 @@
     .manual-link:hover { color: #fff; }
     .hint-text { font-size: 11px; color: #667a9a; margin-top: 10px; }
 
+    .mode-select { display: flex; gap: 8px; margin: 4px 0 16px; }
+    .mode-opt {
+      flex: 1; border: 2px solid #334466; border-radius: 8px; padding: 10px 6px;
+      cursor: pointer; background: #10182c; transition: all 0.15s ease;
+    }
+    .mode-opt:hover { border-color: #556688; }
+    .mode-opt.sel { border-color: #ff4655; background: rgba(255,70,85,0.12); }
+    .mode-opt .mo-title { font-size: 13px; font-weight: 900; letter-spacing: 1px; }
+    .mode-opt .mo-desc { font-size: 10px; color: #88a0c0; margin-top: 3px; }
+    .mode-opt.sel .mo-title { color: #ff4655; }
+
     .spinner {
       width: 46px; height: 46px; border-radius: 50%; margin: 6px auto 0;
       border: 4px solid #1a233a; border-top-color: #ff4655;
@@ -184,6 +195,56 @@
       #radar { display: none; }
       #killFeed { display: none; }
     }
+
+    #roundPanel {
+      position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(13, 19, 34, 0.85); border: 1px solid #334466; border-radius: 8px;
+      padding: 8px 22px; text-align: center; min-width: 240px;
+    }
+    #roundPanel .rp-title { font-size: 10px; color: #667a9a; font-weight: 900; letter-spacing: 1px; }
+    #roundPanel .rp-score { font-size: 20px; font-weight: 900; margin-top: 2px; }
+    #roundPanel .rp-score .atk { color: #ff4655; }
+    #roundPanel .rp-score .def { color: #00ffcc; }
+    #roundPanel .rp-timer { font-size: 13px; color: #ffcc00; font-weight: 800; margin-top: 2px; }
+    #spikeStatus { font-size: 11px; font-weight: 900; margin-top: 4px; display: none; }
+
+    #dmPanel {
+      position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(13, 19, 34, 0.85); border: 1px solid #334466; border-radius: 8px;
+      padding: 8px 22px; text-align: center; min-width: 200px;
+    }
+
+    #actionLabel {
+      position: absolute; bottom: 134px; left: 50%; transform: translate(-50%, 0);
+      font-size: 12px; font-weight: 900; color: #ffcc00; display: none;
+      text-shadow: 0 0 4px #000; letter-spacing: 1px;
+    }
+    #actionProgress {
+      position: absolute; bottom: 118px; left: 50%; transform: translate(-50%, 0);
+      width: 220px; height: 10px; background: rgba(0,0,0,0.5); border: 1px solid #334466;
+      border-radius: 4px; overflow: hidden; display: none;
+    }
+    #actionProgress .fill { height: 100%; width: 0%; background: #ffcc00; }
+
+    #spectatorOverlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;
+      align-items: center; justify-content: center; background: rgba(2,4,10,0.55);
+      pointer-events: none; z-index: 40;
+    }
+    #spectatorOverlay .txt {
+      font-size: 24px; font-weight: 900; color: #ff8a94;
+      text-shadow: 0 0 12px rgba(255,70,85,0.7); text-align: center;
+    }
+
+    #roundBanner {
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.7);
+      font-size: 38px; font-weight: 900; letter-spacing: 3px; opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 4px #000;
+    }
+    #roundBanner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    #roundBanner.atk { color: #ff4655; }
+    #roundBanner.def { color: #00ffcc; }
   </style>
 
   <!-- External Libraries -->
@@ -210,6 +271,23 @@
 
   <div id="killBanner">ELIMINATED</div>
   <div id="pointBanner">MATCH POINT</div>
+  <div id="roundBanner"></div>
+
+  <div id="roundPanel">
+    <div class="rp-title">ROUND <span id="roundNum">1</span></div>
+    <div class="rp-score"><span class="atk" id="scoreAtk">0</span> - <span class="def" id="scoreDef">0</span></div>
+    <div class="rp-timer" id="roundTimer">01:40</div>
+    <div id="spikeStatus">SPIKE ARMED</div>
+  </div>
+
+  <div id="dmPanel" style="display:none;">
+    <div class="rp-title">DEATHMATCH</div>
+    <div class="rp-score" style="color:#fff;"><span id="dmLeaderScore">0</span> <span style="font-size:14px;color:#667a9a;">/ <span id="dmLimit">5</span> KILLS</span></div>
+  </div>
+
+  <div id="actionLabel">設置中…</div>
+  <div id="actionProgress"><div class="fill" id="actionFill"></div></div>
+  <div id="spectatorOverlay"><div class="txt">ELIMINATED<br><span style="font-size:14px; color:#aac;">次のラウンドをお待ちください</span></div></div>
 
   <div id="scoreboardPanel">
     <div class="sb-title">SCOREBOARD</div>
@@ -235,14 +313,15 @@
   <div class="ammo-panel">
     <div style="font-size:12px; color:#ff4655; font-weight:900;" id="weaponName">STRIKER</div>
     <div class="ammo-count"><span id="ammoText">25</span><span id="ammoMax" style="font-size:16px; color:#667a9a;">/25</span></div>
-    <div id="weaponHint">[1] STRIKER　[2] PISTOL</div>
+    <div id="weaponHint">[1]STRIKER [2]PISTOL [3]SCATTER [4]RAILER</div>
   </div>
 
   <div id="lockPrompt">
     CLICK TO PLAY
     <div style="font-size:13px; color:#88a0c0; margin-top:8px; font-weight:normal;">
       [WASD] 移動 | [C] 静音歩き切替 | [Space] ジャンプ | [Q] ダッシュ<br>
-      [右クリック] ADS | [左クリック] 射撃 | [R] リロード | [1/2] 武器切替
+      [右クリック] ADS | [左クリック] 射撃 | [R] リロード | [1-4] 武器切替<br>
+      [E] 中央エリアで設置/解除（長押し）
     </div>
     <div style="font-size:11px; color:#556688; margin-top:10px;">※画面がズレたら、ここをクリックして視点を再ロックしてください</div>
   </div>
@@ -283,6 +362,17 @@
   <div class="card" id="mainMenu">
     <h1>CYBER STRIKE</h1>
     <div class="subtitle" id="netStatus">CONNECTING TO NETWORK...</div>
+
+    <div class="mode-select" id="modeSelect">
+      <div class="mode-opt sel" id="modeBtnBomb" onclick="selectGameMode('bomb')">
+        <div class="mo-title">爆弾解除</div>
+        <div class="mo-desc">2サイト制圧・設置/解除</div>
+      </div>
+      <div class="mode-opt" id="modeBtnDm" onclick="selectGameMode('deathmatch')">
+        <div class="mo-title">デスマッチ</div>
+        <div class="mo-desc">即リスポーン・撃ち合い</div>
+      </div>
+    </div>
 
     <button class="btn" id="btnAutoMatch" disabled onclick="startAutoMatch()">対戦相手を自動で探す</button>
 
@@ -337,24 +427,76 @@ const ICE_CONFIG = {
 const LOBBY_SLOTS = ['CS-ARENA-1','CS-ARENA-2','CS-ARENA-3','CS-ARENA-4','CS-ARENA-5','CS-ARENA-6'];
 
 const WEAPONS = {
-  vandal:  { key: '1', name: 'STRIKER', mag: 25, dmgBody: 28, dmgHead: 105, cooldown: 8, reloadFrames: 50 },
-  sidearm: { key: '2', name: 'PISTOL',  mag: 12, dmgBody: 16, dmgHead: 60,  cooldown: 5, reloadFrames: 30 }
+  vandal:  { key: '1', name: 'STRIKER', mag: 25, dmgBody: 28, dmgHead: 105, cooldown: 8,  reloadFrames: 50, pellets: 1, spread: 0,    adsFov: 50, adsSens: 0.0012 },
+  sidearm: { key: '2', name: 'PISTOL',  mag: 12, dmgBody: 16, dmgHead: 60,  cooldown: 5,  reloadFrames: 30, pellets: 1, spread: 0,    adsFov: 55, adsSens: 0.0015 },
+  shotgun: { key: '3', name: 'SCATTER', mag: 6,  dmgBody: 9,  dmgHead: 20,  cooldown: 26, reloadFrames: 65, pellets: 8, spread: 0.09, adsFov: 60, adsSens: 0.0018 },
+  sniper:  { key: '4', name: 'RAILER',  mag: 5,  dmgBody: 95, dmgHead: 240, cooldown: 42, reloadFrames: 75, pellets: 1, spread: 0,    adsFov: 20, adsSens: 0.0006 }
 };
+function freshAmmo() {
+  const obj = {};
+  for (const k in WEAPONS) obj[k] = WEAPONS[k].mag;
+  return obj;
+}
 
 const COLOR_POOL = [0xff4655, 0x00ffcc, 0x0088ff, 0xffaa00, 0x8855ff, 0x33ff77];
 const SPAWN_POINTS = [
-  { x: -25, z: -25, yaw: Math.PI / 4 },
-  { x: 25,  z: 25,  yaw: -Math.PI * 0.75 },
-  { x: -25, z: 25,  yaw: -Math.PI / 4 },
-  { x: 25,  z: -25, yaw: Math.PI * 0.75 },
-  { x: 0,   z: -38, yaw: 0 },
-  { x: 0,   z: 38,  yaw: Math.PI }
+  { x: 0,   z: -40, yaw: 0 },
+  { x: -18, z: -40, yaw: 0 },
+  { x: 18,  z: -40, yaw: 0 },
+  { x: 0,   z: 40,  yaw: Math.PI },
+  { x: -18, z: 40,  yaw: Math.PI },
+  { x: 18,  z: 40,  yaw: Math.PI },
+  { x: 0,   z: 0,   yaw: Math.PI / 2 },
+  { x: 0,   z: -16, yaw: Math.PI / 2 }
 ];
 let spawnCursor = 0;
 function nextSpawn() {
   const s = SPAWN_POINTS[spawnCursor % SPAWN_POINTS.length];
   spawnCursor++;
   return s;
+}
+
+// --- ラウンド制ルール用の定数 ---
+const TEAM_A = 'A', TEAM_B = 'B';
+const ROUNDS_TO_WIN = 4;       // 先に4ラウンド取った方が勝ち
+const SWAP_INTERVAL = 3;       // 3ラウンドごとに攻守交代
+const ROUND_TIME_MS = 100000;  // ラウンド制限時間
+const PLANT_TIME_MS = 3200;    // 設置に必要な長押し時間
+const DEFUSE_TIME_MS = 5000;   // 解除に必要な長押し時間
+const SPIKE_FUSE_MS = 42000;   // 設置後、爆発までの時間
+const STEP_HEIGHT = 0.58;      // これ以下の段差は自動でよじ登れる(階段/縁石)
+
+// 2サイト(A/B)構成のボムサイト
+const PLANT_ZONES = [
+  { id: 'A', x: -18, z: 2, radius: 6.5 },
+  { id: 'B', x: 18,  z: 2, radius: 6.5 }
+];
+function findZoneAt(x, z) {
+  for (const zn of PLANT_ZONES) {
+    if (Math.hypot(x - zn.x, z - zn.z) <= zn.radius) return zn;
+  }
+  return null;
+}
+
+const ATTACK_SPAWNS = [
+  { x: -18, z: -40, yaw: 0 },
+  { x: 0,   z: -40, yaw: 0 },
+  { x: 18,  z: -40, yaw: 0 }
+];
+const DEFENSE_SPAWNS = [
+  { x: -18, z: 40, yaw: Math.PI },
+  { x: 0,   z: 40, yaw: Math.PI },
+  { x: 18,  z: 40, yaw: Math.PI }
+];
+let atkCursor = 0, defCursor = 0;
+function nextSideSpawn(role) {
+  if (role === 'attack') {
+    const s = ATTACK_SPAWNS[atkCursor % ATTACK_SPAWNS.length]; atkCursor++; return s;
+  }
+  const s = DEFENSE_SPAWNS[defCursor % DEFENSE_SPAWNS.length]; defCursor++; return s;
+}
+function attackGroupForRound(r) {
+  return (Math.floor((r - 1) / SWAP_INTERVAL) % 2 === 0) ? TEAM_A : TEAM_B;
 }
 
 function generateRoomCode() {
@@ -379,14 +521,39 @@ class SoundEngine {
   constructor() { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
   ensureCtx() { if (this.ctx.state === 'suspended') this.ctx.resume(); }
 
-  playShoot() {
+  playShoot(weaponKey) {
     this.ensureCtx(); const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
-    osc.type = 'square'; osc.frequency.setValueAtTime(420, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.09);
-    gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
-    osc.connect(gain); gain.connect(this.ctx.destination);
-    osc.start(now); osc.stop(now + 0.09);
+    if (weaponKey === 'sniper') {
+      const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.22);
+      gain.gain.setValueAtTime(0.6, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.22);
+    } else if (weaponKey === 'shotgun') {
+      for (let i = 0; i < 2; i++) {
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = 'square'; osc.frequency.setValueAtTime(180 - i * 40, now);
+        osc.frequency.exponentialRampToValueAtTime(25, now + 0.13);
+        gain.gain.setValueAtTime(0.45, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.13);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.13);
+      }
+    } else if (weaponKey === 'sidearm') {
+      const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+      osc.type = 'square'; osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+      gain.gain.setValueAtTime(0.35, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.06);
+    } else {
+      const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+      osc.type = 'square'; osc.frequency.setValueAtTime(420, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.09);
+      gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.09);
+    }
   }
 
   playBodyHit() {
@@ -419,15 +586,23 @@ class SoundEngine {
     osc.start(now); osc.stop(now + 0.22);
   }
 
-  playStep(volume) {
+  playStep(volume, pan) {
     this.ensureCtx(); const now = this.ctx.currentTime;
-    const v = (typeof volume === 'number') ? volume : 0.15;
+    const v = (typeof volume === 'number') ? volume : 0.18;
     const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
-    osc.type = 'triangle'; osc.frequency.setValueAtTime(120, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.05);
-    gain.gain.setValueAtTime(v, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    osc.connect(gain); gain.connect(this.ctx.destination);
-    osc.start(now); osc.stop(now + 0.05);
+    const startFreq = 95 + Math.random() * 30;
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(startFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.07);
+    gain.gain.setValueAtTime(v, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.connect(gain);
+    if (this.ctx.createStereoPanner && typeof pan === 'number') {
+      const panner = this.ctx.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      gain.connect(panner); panner.connect(this.ctx.destination);
+    } else {
+      gain.connect(this.ctx.destination);
+    }
+    osc.start(now); osc.stop(now + 0.08);
   }
 
   playReload() {
@@ -471,6 +646,32 @@ let peerInitAttempts = 0;
 let currentSlotResolver = null;
 let matchmakingActive = false;
 
+// --- ラウンド制の状態 ---
+let gameMode = 'bomb'; // 'bomb' | 'deathmatch' (ホストが選んだモードが全員に同期される)
+let myTeam = TEAM_A;
+let playerTeams = new Map(); // id -> 'A' | 'B'
+let currentRound = 1;
+let roundsWon = { A: 0, B: 0 };
+let roundPhase = 'lobby'; // 'lobby' | 'active' | 'ended'
+let roundTimeLeft = ROUND_TIME_MS;
+let spikeState = 'idle'; // idle | planted | defused | exploded
+let spikeSite = null; // 'A' | 'B'
+let spikeTimeLeft = 0;
+let amIAlive = true;
+let plantHoldMs = 0, defuseHoldMs = 0;
+let hostTickAccum = 0;
+let lastFrameTime = performance.now();
+
+function currentAttackGroup() { return attackGroupForRound(currentRound); }
+function roleOfTeam(team) { return team === currentAttackGroup() ? 'attack' : 'defense'; }
+function myRole() { return roleOfTeam(myTeam); }
+
+function selectGameMode(mode) {
+  gameMode = mode;
+  document.getElementById('modeBtnBomb').classList.toggle('sel', mode === 'bomb');
+  document.getElementById('modeBtnDm').classList.toggle('sel', mode === 'deathmatch');
+}
+
 function setLobbyError(msg) { document.getElementById('lobbyErr').textContent = msg || ""; }
 function setMatchStatus(msg) { document.getElementById('matchStatus').textContent = msg; }
 
@@ -506,11 +707,25 @@ function applyMessage(msg) {
       break;
     }
     case 'step': {
-      if (msg.senderId !== myId) audio.playStep();
+      if (msg.senderId !== myId) {
+        const rp = remotePlayers.get(msg.senderId);
+        if (rp) {
+          const dx = rp.group.position.x - myX, dz = rp.group.position.z - myZ;
+          const dist = Math.hypot(dx, dz);
+          const AUDIBLE = 26;
+          if (dist < AUDIBLE) {
+            const vol = 0.22 * (1 - dist / AUDIBLE);
+            const relYaw = Math.atan2(dx, dz) - yaw;
+            audio.playStep(vol, Math.sin(relYaw));
+          }
+        } else {
+          audio.playStep(0.12, 0);
+        }
+      }
       break;
     }
     case 'hit': {
-      if (msg.targetId === myId && hp > 0) {
+      if (msg.targetId === myId && hp > 0 && amIAlive) {
         hp -= msg.damage;
         lastHitBy = msg.senderId;
         document.getElementById('hurtFlash').style.opacity = '1';
@@ -525,20 +740,78 @@ function applyMessage(msg) {
       addKillFeed(nameOf(msg.killerId), nameOf(msg.deadId));
       if (msg.killerId === myId) { showKillBanner(); audio.playKill(); hitStopFrames = 6; }
       renderScoreboard();
-      checkPointBanner();
-      checkWinCondition(msg.killerId);
+      if (gameMode === 'bomb') {
+        if (msg.deadId !== myId) {
+          const rp = remotePlayers.get(msg.deadId);
+          if (rp) rp.group.visible = false;
+        }
+        if (isHost) checkRoundElimination();
+      } else {
+        updateDmHud();
+        if (isHost) checkDmWin(msg.killerId);
+      }
       break;
     }
     case 'join': {
+      if (msg.team) playerTeams.set(msg.id, msg.team);
       handleJoin(msg.id, msg.name, msg.color, { x: msg.x, y: msg.y, z: msg.z, yaw: msg.yaw });
       break;
     }
     case 'leave': {
       handleLeave(msg.id);
+      playerTeams.delete(msg.id);
+      if (gameMode === 'bomb' && isHost) checkRoundElimination();
       break;
     }
     case 'restart': {
       doRestartLocal();
+      break;
+    }
+    case 'roundStart': {
+      applyRoundStart(msg);
+      break;
+    }
+    case 'roundEnd': {
+      applyRoundEnd(msg);
+      break;
+    }
+    case 'roundTick': {
+      if (!isHost) { roundTimeLeft = msg.roundTimeLeft; spikeTimeLeft = msg.spikeTimeLeft; spikeState = msg.spikeState; }
+      updateRoundHud();
+      break;
+    }
+    case 'spikePlant': {
+      if (spikeState === 'idle') {
+        spikeState = 'planted'; spikeSite = msg.site; spikeTimeLeft = SPIKE_FUSE_MS; roundTimeLeft = 0;
+        flashRoundBanner(`${msg.site}サイトに設置された`, 'atk');
+      }
+      updateRoundHud();
+      break;
+    }
+    case 'spikeDefuse': {
+      if (spikeState === 'planted') {
+        spikeState = 'defused';
+        if (isHost) endRound('defense');
+      }
+      updateRoundHud();
+      break;
+    }
+    case 'spikeExplode': {
+      spikeState = 'exploded';
+      if (isHost) endRound('attack');
+      updateRoundHud();
+      break;
+    }
+    case 'matchEnd2': {
+      showTeamMatchEnd(msg.winner);
+      break;
+    }
+    case 'dmStart': {
+      applyDmStart(msg);
+      break;
+    }
+    case 'dmMatchEnd': {
+      showDmMatchEnd(msg.winnerId);
       break;
     }
   }
@@ -549,26 +822,305 @@ function reportDeath(killerId) {
   applyMessage(payload);
   if (isHost) broadcast(payload, null);
   else if (hostConn && hostConn.open) { try { hostConn.send(payload); } catch (e) {} }
-  respawnSelf();
+
+  if (gameMode === 'deathmatch') {
+    respawnSelfDM();
+  } else {
+    amIAlive = false;
+    gunGroup.visible = false;
+    document.getElementById('spectatorOverlay').style.display = 'flex';
+  }
 }
 
-function checkWinCondition(killerId) {
+// --- デスマッチ: 即リスポーン ---
+function respawnSelfDM() {
+  if (!isGameActive) return;
+  const s = nextSpawn();
+  myX = s.x; myZ = s.z; myY = 1.6; yaw = s.yaw; pitch = 0; myVy = 0;
+  camera.rotation.set(0, yaw, 0, 'YXZ');
+  hp = 100;
+  ammoByWeapon = freshAmmo();
+  reloadTimer = 0;
+  amIAlive = true;
+}
+
+function checkDmWin(killerId) {
   const entry = scoreboard.get(killerId);
   if (entry && entry.score >= SCORE_LIMIT && isGameActive) {
     isGameActive = false;
-    showMatchEnd(killerId);
+    const msg = { type: 'dmMatchEnd', winnerId: killerId };
+    applyMessage(msg); broadcast(msg, null);
   }
 }
-function checkPointBanner() {
-  if (pointBannerShown) return;
-  let anyOnPoint = false;
-  scoreboard.forEach(v => { if (v.score === SCORE_LIMIT - 1) anyOnPoint = true; });
-  if (anyOnPoint) {
+
+function showDmMatchEnd(winnerId) {
+  try { document.exitPointerLock(); } catch (e) {}
+  isGameActive = false;
+  const overlay = document.getElementById('matchEndOverlay');
+  const title = document.getElementById('endTitle');
+  const won = winnerId === myId;
+  title.textContent = won ? 'YOU WIN' : (nameOf(winnerId) + ' WINS');
+  title.className = 'end-title ' + (won ? 'win' : 'lose');
+  document.getElementById('btnRestart').style.display = isHost ? 'block' : 'none';
+  renderScoreboard();
+  overlay.style.display = 'flex';
+}
+
+// --- デスマッチ開始(ホストのみ) ---
+function startDeathmatch() {
+  if (!isHost) return;
+  const allIds = [myId, ...guestConns.keys()];
+  if (allIds.length < 2) { waitForOpponent(); return; }
+  spawnCursor = 0;
+  pointBannerShown = false;
+  const assignments = {};
+  allIds.forEach(id => {
+    const sp = nextSpawn();
+    assignments[id] = { x: sp.x, z: sp.z, yaw: sp.yaw };
+  });
+  isGameActive = true;
+  const msg = { type: 'dmStart', assignments, scoreLimit: SCORE_LIMIT };
+  applyMessage(msg);
+  broadcast(msg, null);
+}
+
+function applyDmStart(msg) {
+  isGameActive = true; isConnected = true;
+  amIAlive = true; hp = 100;
+  ammoByWeapon = freshAmmo();
+  reloadTimer = 0; pointBannerShown = false;
+  gunGroup.visible = true;
+  document.getElementById('lobbyModal').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('spectatorOverlay').style.display = 'none';
+  document.getElementById('roundBanner').classList.remove('show');
+  showModeHud();
+
+  const mine = msg.assignments[myId];
+  if (mine) {
+    myX = mine.x; myZ = mine.z; myY = 1.6; yaw = mine.yaw; pitch = 0; myVy = 0;
+    camera.rotation.set(0, yaw, 0, 'YXZ');
+  }
+  Object.entries(msg.assignments).forEach(([id, a]) => {
+    if (id === myId) return;
+    const rp = remotePlayers.get(id);
+    if (rp) {
+      rp.group.position.set(a.x, 0, a.z);
+      rp.group.rotation.y = a.yaw;
+      rp.group.visible = true;
+      rp.target = { x: a.x, y: 1.6, z: a.z, yaw: a.yaw };
+    }
+  });
+  updateDmHud();
+}
+
+function updateDmHud() {
+  let leaderScore = 0;
+  scoreboard.forEach(v => { if (v.score > leaderScore) leaderScore = v.score; });
+  const a = document.getElementById('dmLeaderScore'); if (a) a.textContent = leaderScore;
+  const b = document.getElementById('dmLimit'); if (b) b.textContent = SCORE_LIMIT;
+  if (!pointBannerShown && leaderScore === SCORE_LIMIT - 1) {
     pointBannerShown = true;
     const el = document.getElementById('pointBanner');
     el.classList.add('show');
     setTimeout(() => el.classList.remove('show'), 1200);
   }
+  updateNameTag();
+}
+
+// モード切り替えに応じてラウンドHUD/デスマッチHUDの表示を切り替える
+function showModeHud() {
+  document.getElementById('roundPanel').style.display = (gameMode === 'bomb') ? 'block' : 'none';
+  document.getElementById('dmPanel').style.display = (gameMode === 'deathmatch') ? 'block' : 'none';
+}
+
+// gameModeに応じて実際のマッチ開始処理へ振り分ける(ホストのみ)
+function beginMatchFlow() {
+  if (gameMode === 'bomb') startRound(); else startDeathmatch();
+}
+
+function checkPointBanner() {
+  if (pointBannerShown) return;
+  if (roundsWon.A === ROUNDS_TO_WIN - 1 || roundsWon.B === ROUNDS_TO_WIN - 1) {
+    pointBannerShown = true;
+    const el = document.getElementById('pointBanner');
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1200);
+  }
+}
+
+// --- ラウンド勝敗判定(ホストのみ) ---
+function checkRoundElimination() {
+  if (!isHost || roundPhase !== 'active') return;
+  const attackGroup = currentAttackGroup();
+  let attackersAlive = 0, defendersAlive = 0;
+  scoreboard.forEach((v, id) => {
+    const alive = (id === myId) ? amIAlive : (remotePlayers.get(id) ? remotePlayers.get(id).group.visible : true);
+    const team = playerTeams.get(id) || TEAM_A;
+    if (team === attackGroup) { if (alive) attackersAlive++; } else { if (alive) defendersAlive++; }
+  });
+  if (defendersAlive === 0) { endRound('attack'); return; }
+  if (attackersAlive === 0 && spikeState === 'idle') { endRound('defense'); return; }
+}
+
+function endRound(winnerRole) {
+  if (!isHost || roundPhase !== 'active') return;
+  roundPhase = 'ended';
+  const attackGroup = currentAttackGroup();
+  const winnerGroup = (winnerRole === 'attack') ? attackGroup : (attackGroup === TEAM_A ? TEAM_B : TEAM_A);
+  roundsWon[winnerGroup]++;
+  const msg = { type: 'roundEnd', winnerGroup, scoreA: roundsWon.A, scoreB: roundsWon.B, round: currentRound };
+  applyMessage(msg); broadcast(msg, null);
+
+  if (roundsWon[winnerGroup] >= ROUNDS_TO_WIN) {
+    setTimeout(() => {
+      const endMsg = { type: 'matchEnd2', winner: winnerGroup };
+      applyMessage(endMsg); broadcast(endMsg, null);
+    }, 2500);
+  } else {
+    setTimeout(() => {
+      currentRound++;
+      startRound();
+    }, 4000);
+  }
+}
+
+function startRound() {
+  if (!isHost) return;
+  const allIds = [myId, ...guestConns.keys()];
+  if (allIds.length < 2) {
+    // 対戦相手がまだ(あるいはもう)いない状態でラウンドを始めてしまうと、
+    // 片方のチームが常に0人の"幽霊マッチ"になり、判定がおかしくなる。
+    // これが「再戦ボタンを押すとさらにバグる」の主因だった。
+    waitForOpponent();
+    return;
+  }
+  roundPhase = 'active';
+  spikeState = 'idle'; spikeSite = null; spikeTimeLeft = 0; roundTimeLeft = ROUND_TIME_MS;
+  atkCursor = 0; defCursor = 0;
+  pointBannerShown = false;
+  const attackGroup = currentAttackGroup();
+  const assignments = {};
+  allIds.forEach(id => {
+    if (!playerTeams.has(id)) playerTeams.set(id, TEAM_A);
+    const role = playerTeams.get(id) === attackGroup ? 'attack' : 'defense';
+    const sp = nextSideSpawn(role);
+    assignments[id] = { x: sp.x, z: sp.z, yaw: sp.yaw, team: playerTeams.get(id), role };
+  });
+  const msg = { type: 'roundStart', round: currentRound, assignments, scoreA: roundsWon.A, scoreB: roundsWon.B };
+  applyMessage(msg);
+  broadcast(msg, null);
+}
+
+// --- 対戦相手待ち画面に戻す(ホストのみ) ---
+function waitForOpponent() {
+  isGameActive = false;
+  roundPhase = 'lobby';
+  try { document.exitPointerLock(); } catch (e) {}
+  document.getElementById('matchEndOverlay').style.display = 'none';
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('lobbyModal').style.display = 'flex';
+  document.getElementById('mainMenu').style.display = 'none';
+  document.getElementById('matchmakingMenu').style.display = 'none';
+  document.getElementById('hostMenu').style.display = 'block';
+  document.getElementById('displayRoomId').textContent = myRoomCode;
+  const container = document.getElementById('qrContainer');
+  container.innerHTML = '';
+  new QRCode(container, { text: myRoomCode, width: 180, height: 180 });
+  document.getElementById('hostWaitStatus').textContent = '対戦相手の参加を待っています…';
+}
+
+function applyRoundStart(msg) {
+  currentRound = msg.round;
+  roundsWon = { A: msg.scoreA, B: msg.scoreB };
+  roundPhase = 'active';
+  spikeState = 'idle'; spikeSite = null; spikeTimeLeft = 0; roundTimeLeft = ROUND_TIME_MS;
+  amIAlive = true; hp = 100;
+  ammoByWeapon = freshAmmo();
+  reloadTimer = 0; plantHoldMs = 0; defuseHoldMs = 0;
+  pointBannerShown = false;
+  gunGroup.visible = true;
+  document.getElementById('roundBanner').classList.remove('show');
+  document.getElementById('spectatorOverlay').style.display = 'none';
+
+  const mine = msg.assignments[myId];
+  if (mine) {
+    myTeam = mine.team;
+    myX = mine.x; myZ = mine.z; myY = 1.6; yaw = mine.yaw; pitch = 0; myVy = 0;
+    camera.rotation.set(0, yaw, 0, 'YXZ');
+  }
+  Object.entries(msg.assignments).forEach(([id, a]) => {
+    playerTeams.set(id, a.team);
+    if (id === myId) return;
+    const rp = remotePlayers.get(id);
+    if (rp) {
+      rp.group.position.set(a.x, 0, a.z);
+      rp.group.rotation.y = a.yaw;
+      rp.group.visible = true;
+      rp.target = { x: a.x, y: 1.6, z: a.z, yaw: a.yaw };
+    }
+  });
+  checkPointBanner();
+  updateRoundHud();
+}
+
+function applyRoundEnd(msg) {
+  roundsWon = { A: msg.scoreA, B: msg.scoreB };
+  roundPhase = 'ended';
+  const role = attackGroupForRound(msg.round) === msg.winnerGroup ? 'attack' : 'defense';
+  flashRoundBanner(role === 'attack' ? 'ATTACKERS WIN' : 'DEFENDERS WIN', role === 'attack' ? 'atk' : 'def');
+  updateRoundHud();
+}
+
+function flashRoundBanner(text, cls) {
+  const el = document.getElementById('roundBanner');
+  el.textContent = text;
+  el.className = cls;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function updateRoundHud() {
+  const roundNumEl = document.getElementById('roundNum');
+  if (!roundNumEl) return;
+  roundNumEl.textContent = currentRound;
+  const atkGroup = currentAttackGroup();
+  document.getElementById('scoreAtk').textContent = roundsWon[atkGroup];
+  document.getElementById('scoreDef').textContent = roundsWon[atkGroup === TEAM_A ? TEAM_B : TEAM_A];
+  const t = Math.max(0, spikeState === 'planted' ? spikeTimeLeft : roundTimeLeft);
+  const secs = Math.ceil(t / 1000);
+  document.getElementById('roundTimer').textContent = String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
+  const spikeEl = document.getElementById('spikeStatus');
+  if (spikeState === 'planted') { spikeEl.style.display = 'block'; spikeEl.textContent = 'SPIKE ARMED - ' + spikeSite + 'サイト'; spikeEl.style.color = '#ff4655'; }
+  else if (spikeState === 'defused') { spikeEl.style.display = 'block'; spikeEl.textContent = 'SPIKE DEFUSED'; spikeEl.style.color = '#00ffcc'; }
+  else { spikeEl.style.display = 'none'; }
+
+  updateNameTag();
+}
+
+function updateNameTag() {
+  const roleEl = document.getElementById('myRole');
+  if (!roleEl || !myName) return;
+  if (gameMode === 'bomb') {
+    roleEl.textContent = myName + ' [' + (myRole() === 'attack' ? 'ATK' : 'DEF') + ']';
+    roleEl.style.color = myRole() === 'attack' ? '#ff4655' : '#00ffcc';
+  } else {
+    roleEl.textContent = myName;
+    roleEl.style.color = hexColor(myColor);
+  }
+}
+
+function showTeamMatchEnd(winnerGroup) {
+  try { document.exitPointerLock(); } catch (e) {}
+  isGameActive = false;
+  const overlay = document.getElementById('matchEndOverlay');
+  const title = document.getElementById('endTitle');
+  const won = myTeam === winnerGroup;
+  title.textContent = won ? 'YOU WIN' : '相手チームの勝利';
+  title.className = 'end-title ' + (won ? 'win' : 'lose');
+  document.getElementById('btnRestart').style.display = isHost ? 'block' : 'none';
+  renderScoreboard();
+  overlay.style.display = 'flex';
 }
 
 // --- キルフィード / スコアボード ---
@@ -665,7 +1217,7 @@ function handleLeave(id) {
 }
 function collectHitboxes() {
   let arr = [];
-  remotePlayers.forEach(rp => arr.push(...rp.hitboxGroup.children));
+  remotePlayers.forEach(rp => { if (rp.group.visible) arr.push(...rp.hitboxGroup.children); });
   return arr;
 }
 
@@ -680,6 +1232,8 @@ function toggleManualPanel() {
 function attachPeerHandlers(p) {
   p.on('connection', c => {
     if (isHost) {
+      // 満員なら onReady を待たずに即座に拒否する(参加側の判定を速くするため)
+      if (guestConns.size >= MAX_PLAYERS - 1) { try { c.close(); } catch (e) {} return; }
       handleNewGuestConnection(c);
     } else {
       try { c.close(); } catch (e) {}
@@ -688,9 +1242,14 @@ function attachPeerHandlers(p) {
 
   p.on('error', err => {
     console.error("Peer Error:", err);
-    if (currentSlotResolver && (err.type === 'peer-unavailable' || err.type === 'unavailable-id')) {
+    // 自動マッチメイキング中(部屋探し/部屋作成の試行中)は、この試行専用のPromiseが
+    // 個別にエラーを処理して次のスロットに進む。ここで汎用リカバリ(destroy+initPeer)を
+    // 走らせると進行中のマッチメイキングの peer を横から壊してしまい、
+    // 「たまに参加できない/固まる」不具合の原因になっていたため抑止する。
+    if (currentSlotResolver) {
       const r = currentSlotResolver; currentSlotResolver = null; r(false); return;
     }
+    if (matchmakingActive) return;
     if (err.type === 'unavailable-id') {
       peerInitAttempts++;
       if (peerInitAttempts < 5) { p.destroy(); initPeer(); return; }
@@ -729,16 +1288,22 @@ function initializeAsHost() {
   isHost = true;
   myName = 'P1';
   myColor = COLOR_POOL[0];
-  const s = nextSpawn();
-  myX = s.x; myZ = s.z; myY = 1.6; yaw = s.yaw; pitch = 0; myVy = 0;
   hp = 100;
-  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+  ammoByWeapon = freshAmmo();
   scoreboard.clear();
   remotePlayers.forEach(v => scene.remove(v.group));
   remotePlayers.clear();
+  guestConns.forEach(c => { try { c.close(); } catch (e) {} });
+  guestConns.clear();
+  playerTeams.clear();
+  myTeam = TEAM_A;
+  playerTeams.set(myId, myTeam);
   scoreboard.set(myId, { name: myName, color: myColor, score: 0 });
-  camera.rotation.set(0, yaw, 0, 'YXZ');
+  currentRound = 1; roundsWon = { A: 0, B: 0 }; pointBannerShown = false;
+  camera.rotation.set(0, 0, 0, 'YXZ');
+  showModeHud();
   renderScoreboard();
+  beginMatchFlow();
 }
 
 function hostGame() {
@@ -778,7 +1343,11 @@ async function startAutoMatch() {
   document.getElementById('matchmakingMenu').style.display = 'block';
   setMatchStatus('対戦相手を探しています…');
 
-  const order = shuffle(LOBBY_SLOTS);
+  // 固定順(シャッフルしない)で探す。同時に複数人が探し始めた場合でも
+  // 全員が同じ順番でスロットを見にいくため、最初に見つかった/作られた
+  // 部屋に自然と集まりやすくなる(シャッフルすると各人が別々の空き部屋を
+  // 作ってしまい、お互いに出会えないことがあった)。
+  const order = LOBBY_SLOTS;
 
   for (const slot of order) {
     if (!matchmakingActive) return;
@@ -802,31 +1371,30 @@ function tryJoinSlot(slotId) {
       testConn = peer.connect(slotId, { reliable: true });
     } catch (e) { currentSlotResolver = null; resolve(false); return; }
 
-    const timer = setTimeout(() => {
-      if (settled) return; settled = true; currentSlotResolver = null;
-      try { testConn.close(); } catch (e) {}
-      resolve(false);
-    }, 2200);
-
-    const onOpen = () => {
+    const finish = (ok) => {
       if (settled) return; settled = true; currentSlotResolver = null;
       clearTimeout(timer);
-      isHost = false;
-      hostConn = testConn;
-      setupConnection(testConn);
-      resolve(true);
+      resolve(ok);
     };
-    // 受信側では 'open' がすでに発火済みのことがあるため、まず現在の状態を確認する
-    if (testConn.open) { onOpen(); } else { testConn.on('open', onOpen); }
 
-    testConn.on('close', () => {
-      if (settled) return; settled = true; currentSlotResolver = null;
-      clearTimeout(timer); resolve(false);
+    // 接続(open)が成立しても、満員などでホスト側が welcome を送らずに
+    // 閉じるケースがあるため、"open" ではなく実際の welcome 受信をもって
+    // 成功と判定する。これをしないと「open はしたが welcome が来ない」状態で
+    // 画面が固まったまま次のスロットに進めなくなる不具合があった。
+    const timer = setTimeout(() => {
+      try { testConn.close(); } catch (e) {}
+      finish(false);
+    }, 3500);
+
+    testConn.on('data', data => {
+      if (data && data.type === 'welcome') finish(true);
     });
-    testConn.on('error', () => {
-      if (settled) return; settled = true; currentSlotResolver = null;
-      clearTimeout(timer); resolve(false);
-    });
+    testConn.on('close', () => finish(false));
+    testConn.on('error', () => finish(false));
+
+    isHost = false;
+    hostConn = testConn;
+    setupConnection(testConn); // welcome を受け取ったら applyWelcome() が実際の入室処理を行う
   });
 }
 
@@ -834,11 +1402,44 @@ async function becomeHostOnFreeSlot(order) {
   for (const slot of order) {
     if (!matchmakingActive) return;
     setMatchStatus(`部屋を作成中… (${slot})`);
-    const ok = await tryHostSlot(slot);
-    if (ok) { matchmakingActive = false; return; }
+    const result = await tryHostSlot(slot);
+    if (result.ok) { matchmakingActive = false; return; }
+
+    // 「そのIDは使用中」= ほぼ同時に他の人がこのスロットのホストになった
+    // 可能性が高いので、次のスロットへ進む前にゲストとしてそこへの
+    // 参加を試みる。これをしないと同時に部屋探しを始めた2人がそれぞれ
+    // 別のスロットのホストになってしまい、お互い永遠に出会えなかった。
+    if (result.reason === 'unavailable-id' && matchmakingActive) {
+      const ready = await ensureFreshGuestPeer();
+      if (ready && matchmakingActive) {
+        setMatchStatus(`参加を試行中… (${slot})`);
+        const joined = await tryJoinSlot(slot);
+        if (joined) { matchmakingActive = false; return; }
+      }
+    }
   }
   setMatchStatus('部屋を作れませんでした。回線を確認して再試行してください。');
   matchmakingActive = false;
+  isHost = false;
+  // 失敗し続けた場合、直前の使い捨てpeerが壊れたまま残らないよう作り直しておく
+  initPeer();
+}
+
+// 使い捨てのランダムID peer を用意し、準備できたら resolve するヘルパー。
+// ホスト獲得レースに負けた直後に「ゲストとして参加」へ切り替えるために使う。
+function ensureFreshGuestPeer() {
+  return new Promise(resolve => {
+    if (peer) { try { peer.destroy(); } catch (e) {} }
+    myRoomCode = generateRoomCode();
+    const p = new Peer(myRoomCode, { config: ICE_CONFIG });
+    peer = p;
+    p.on('open', id => {
+      myRoomCode = id; myId = id;
+      resolve(true);
+    });
+    p.on('error', () => resolve(false));
+    attachPeerHandlers(p);
+  });
 }
 
 function tryHostSlot(slotId) {
@@ -852,11 +1453,15 @@ function tryHostSlot(slotId) {
       if (settled) return; settled = true;
       myId = id; myRoomCode = id;
       initializeAsHost();
-      resolve(true);
+      resolve({ ok: true });
     });
     p.on('error', err => {
       if (settled) return; settled = true;
-      resolve(false);
+      // このスロットは使えなかったので、試したpeerを破棄してリークさせない
+      // (放置すると立て続けのPeer生成でシグナリングサーバーへの接続が
+      // 不安定になり、それも「たまに参加できない」の一因だった)
+      try { p.destroy(); } catch (e) {}
+      resolve({ ok: false, reason: err.type });
     });
     attachPeerHandlers(p);
   });
@@ -925,40 +1530,60 @@ function setupConnection(conn) {
   };
   if (conn.open) { onOpen(); } else { conn.on('open', onOpen); }
 
+  let receivedWelcome = false;
   conn.on('data', data => {
     if (!data || !data.type) return;
-    if (data.type === 'welcome') { applyWelcome(data); }
+    if (data.type === 'welcome') { receivedWelcome = true; applyWelcome(data); }
     else { applyMessage(data); }
   });
-  conn.on('close', () => handleDisconnect());
-  conn.on('error', () => handleDisconnect());
+  conn.on('close', () => {
+    if (!receivedWelcome && !matchmakingActive) {
+      setLobbyError('ルームに参加できませんでした(満員の可能性があります)。コードを確認して再試行してください。');
+    }
+    handleDisconnect();
+  });
+  conn.on('error', () => {
+    if (!receivedWelcome && !matchmakingActive) {
+      setLobbyError('ルームへの接続に失敗しました。回線を確認して再試行してください。');
+    }
+    handleDisconnect();
+  });
 }
 
 function applyWelcome(data) {
-  myName = data.yourName; myColor = data.yourColor;
+  myName = data.yourName; myColor = data.yourColor; myTeam = data.yourTeam;
+  gameMode = data.gameMode || 'bomb';
   myX = data.spawn.x; myZ = data.spawn.z; myY = 1.6; yaw = data.spawn.yaw || 0; pitch = 0; myVy = 0;
-  hp = 100;
-  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+  hp = 100; amIAlive = true;
+  ammoByWeapon = freshAmmo();
   pointBannerShown = false;
 
   scoreboard.clear();
   remotePlayers.forEach(v => scene.remove(v.group));
   remotePlayers.clear();
+  playerTeams.clear();
+  playerTeams.set(myId, myTeam);
   scoreboard.set(myId, { name: myName, color: myColor, score: 0 });
 
+  currentRound = data.round; roundsWon = { A: data.scoreA, B: data.scoreB };
+  roundPhase = data.roundPhase; spikeState = data.spikeState; spikeSite = data.spikeSite || null;
+  spikeTimeLeft = data.spikeTimeLeft; roundTimeLeft = data.roundTimeLeft;
+
   (data.roster || []).forEach(p => {
+    playerTeams.set(p.id, p.team);
     handleJoin(p.id, p.name, p.color, { x: p.x, y: p.y, z: p.z, yaw: p.yaw });
     if (scoreboard.has(p.id)) scoreboard.get(p.id).score = p.score || 0;
   });
 
   document.getElementById('lobbyModal').style.display = 'none';
   document.getElementById('hud').style.display = 'block';
-  document.getElementById('myRole').textContent = myName;
-  document.getElementById('myRole').style.color = hexColor(myColor);
+  gunGroup.visible = true;
+  showModeHud();
 
   isConnected = true; isGameActive = true;
   camera.rotation.set(0, yaw, 0, 'YXZ');
   renderScoreboard();
+  if (gameMode === 'bomb') updateRoundHud(); else updateDmHud();
 }
 
 // --- ホスト側: 新規ゲスト接続の受け入れ ---
@@ -971,7 +1596,15 @@ function handleNewGuestConnection(conn) {
 
     const color = COLOR_POOL[scoreboard.size % COLOR_POOL.length];
     const name = 'P' + (scoreboard.size + 1);
-    const spawn = nextSpawn();
+    let team = null, spawn;
+    if (gameMode === 'bomb') {
+      team = (playerTeams.size % 2 === 0) ? TEAM_A : TEAM_B;
+      playerTeams.set(id, team);
+      const role = (team === currentAttackGroup()) ? 'attack' : 'defense';
+      spawn = nextSideSpawn(role);
+    } else {
+      spawn = nextSpawn();
+    }
     scoreboard.set(id, { name, color, score: 0 });
 
     const roster = [];
@@ -983,12 +1616,19 @@ function handleNewGuestConnection(conn) {
         const rp = remotePlayers.get(k);
         pos = rp ? { x: rp.group.position.x, y: rp.group.position.y + 1.6, z: rp.group.position.z, yaw: rp.group.rotation.y } : { x: 0, y: 1.6, z: 0, yaw: 0 };
       }
-      roster.push({ id: k, name: v.name, color: v.color, score: v.score, x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw });
+      roster.push({ id: k, name: v.name, color: v.color, score: v.score, team: playerTeams.get(k), x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw });
     });
 
-    try { conn.send({ type: 'welcome', yourName: name, yourColor: color, spawn: { x: spawn.x, z: spawn.z, yaw: spawn.yaw }, roster }); } catch (e) {}
+    try {
+      conn.send({
+        type: 'welcome', yourName: name, yourColor: color, yourTeam: team, gameMode,
+        spawn: { x: spawn.x, z: spawn.z, yaw: spawn.yaw }, roster,
+        round: currentRound, scoreA: roundsWon.A, scoreB: roundsWon.B,
+        roundPhase, spikeState, spikeSite, spikeTimeLeft, roundTimeLeft
+      });
+    } catch (e) {}
 
-    broadcast({ type: 'join', id, name, color, x: spawn.x, y: 1.6, z: spawn.z, yaw: spawn.yaw }, id);
+    broadcast({ type: 'join', id, name, color, team, x: spawn.x, y: 1.6, z: spawn.z, yaw: spawn.yaw }, id);
     handleJoin(id, name, color, { x: spawn.x, y: 1.6, z: spawn.z, yaw: spawn.yaw });
     renderScoreboard();
 
@@ -1001,8 +1641,16 @@ function handleNewGuestConnection(conn) {
     conn.on('close', () => {
       guestConns.delete(id);
       handleLeave(id);
+      playerTeams.delete(id);
       broadcast({ type: 'leave', id }, id);
       renderScoreboard();
+      if (guestConns.size === 0 && isGameActive) {
+        // 最後の一人が抜けた。一人ぼっちのまま"試合中"を続けると判定が
+        // おかしくなるので、待機画面に戻して次の対戦相手を待つ。
+        waitForOpponent();
+      } else if (gameMode === 'bomb') {
+        checkRoundElimination();
+      }
     });
     conn.on('error', () => {});
 
@@ -1010,8 +1658,9 @@ function handleNewGuestConnection(conn) {
       isGameActive = true; isConnected = true;
       document.getElementById('lobbyModal').style.display = 'none';
       document.getElementById('hud').style.display = 'block';
-      document.getElementById('myRole').textContent = myName;
-      document.getElementById('myRole').style.color = hexColor(myColor);
+      gunGroup.visible = true;
+      showModeHud();
+      beginMatchFlow(); // 待機中だった場合、ここで実際に試合を開始する
     }
     document.getElementById('hostWaitStatus').textContent = `プレイヤー ${scoreboard.size}/${MAX_PLAYERS} 参加中`;
   };
@@ -1055,13 +1704,74 @@ function buildMap() {
   const grid = new THREE.GridHelper(100, 40, 0xff4655, 0x1a233a);
   grid.position.y = 0.01; scene.add(grid);
 
-  addBlock(0, 2.5, 0, 12, 5, 12, 0xff4655);
-  addBlock(-18, 2, -18, 8, 4, 8, 0x00ffcc);
-  addBlock(18, 2, 18, 8, 4, 8, 0x0088ff);
-  addBlock(10, 1.5, -10, 6, 3, 6, 0xffaa00);
-  addBlock(-10, 1.5, 10, 6, 3, 6, 0x8855ff);
-  addBlock(0, 1.5, -30, 10, 3, 4, 0x33ff77);
-  addBlock(0, 1.5, 30, 10, 3, 4, 0x33ff77);
+  const LANE_COLOR = 0x445577, SITE_A_COLOR = 0xdd6644, SITE_B_COLOR = 0x4488dd,
+        TOWER_COLOR = 0x8899bb, CRATE_COLOR = 0x556688, RISER_COLOR = 0xccaa44;
+
+  // --- Aレーン(西側) : 攻撃側スポーンからAサイトへ ---
+  addBlock(-24, 1.5, -20, 1, 3, 24, LANE_COLOR);
+  addBlock(-11, 1.5, -20, 1, 3, 24, LANE_COLOR);
+  addBlock(-21, 1, -32, 5, 2, 2, LANE_COLOR); // Aレーン入口の隔壁(視線切り、中央3mが通路)
+  addBlock(-13, 1, -32, 5, 2, 2, LANE_COLOR);
+
+  // --- Bレーン(東側) : 攻撃側スポーンからBサイトへ ---
+  addBlock(24, 1.5, -20, 1, 3, 24, LANE_COLOR);
+  addBlock(11, 1.5, -20, 1, 3, 24, LANE_COLOR);
+  addBlock(21, 1, -32, 5, 2, 2, LANE_COLOR);
+  addBlock(13, 1, -32, 5, 2, 2, LANE_COLOR);
+
+  // --- ミッド(中央連絡路) : タワーで高低差を作る ---
+  addBlock(-3.5, 1, -6, 2, 2, 10, TOWER_COLOR);
+  addBlock(3.5, 1, -6, 2, 2, 10, TOWER_COLOR);
+  buildStairs(0, 3, 1, 6, 0.5, 1.3, 4, TOWER_COLOR); // ミッドタワー階段(南から登る)
+
+  // --- Aサイト: コの字型カバー(攻撃側から見て入口は開放) ---
+  addBlock(-18, 1.5, 8, 10, 3, 1, SITE_A_COLOR);   // 奥壁
+  addBlock(-23, 1.5, 5, 1, 3, 6, SITE_A_COLOR);    // 左壁
+  addBlock(-13, 1.5, 5, 1, 3, 6, SITE_A_COLOR);    // 右壁
+  addBlock(-19, 0.6, -1, 3, 1.2, 3, CRATE_COLOR);  // サイト内の低カバー
+  buildStairs(-15.5, 5.5, -1, 2, 0.5, 1.2, 3, RISER_COLOR); // サイト内の小さな高台
+
+  // --- Bサイト: Aサイトのミラー ---
+  addBlock(18, 1.5, 8, 10, 3, 1, SITE_B_COLOR);
+  addBlock(23, 1.5, 5, 1, 3, 6, SITE_B_COLOR);
+  addBlock(13, 1.5, 5, 1, 3, 6, SITE_B_COLOR);
+  addBlock(19, 0.6, -1, 3, 1.2, 3, CRATE_COLOR);
+  buildStairs(15.5, 5.5, -1, 2, 0.5, 1.2, 3, RISER_COLOR);
+
+  // --- ディフェンス側スポーン手前のカバー ---
+  addBlock(-18, 1, 30, 6, 2, 3, LANE_COLOR);
+  addBlock(18, 1, 30, 6, 2, 3, LANE_COLOR);
+  addBlock(0, 1.2, 34, 8, 2.4, 3, LANE_COLOR);
+
+  // --- 攻撃側スポーン手前のカバー ---
+  addBlock(-8, 0.8, -34, 3, 1.6, 3, CRATE_COLOR);
+  addBlock(8, 0.8, -34, 3, 1.6, 3, CRATE_COLOR);
+
+  // --- 各ボムサイトの地面マーカー(A/Bで色分け) ---
+  PLANT_ZONES.forEach(zn => {
+    const ringColor = zn.id === 'A' ? 0xff9944 : 0x44ccff;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(zn.radius - 0.3, zn.radius, 48),
+      new THREE.MeshBasicMaterial({ color: ringColor, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(zn.x, 0.05, zn.z);
+    scene.add(ring);
+  });
+}
+
+// 階段ブロックを積んで実際に歩いて登れる段差を作る(STEP_HEIGHTの自動よじ登り判定と対応)
+// dir: +1 なら+z方向、-1なら-z方向へ登っていく
+function buildStairs(cx, cz0, dir, steps, stepH, stepDepth, width, color) {
+  for (let i = 0; i < steps; i++) {
+    const h = stepH * (i + 1);
+    const zOff = cz0 + dir * (i * stepDepth + stepDepth / 2);
+    addBlock(cx, h / 2, zOff, width, h, stepDepth, color);
+  }
+  const topH = stepH * steps;
+  const platDepth = width;
+  const platformZ = cz0 + dir * (steps * stepDepth + platDepth / 2);
+  addBlock(cx, topH - 0.05, platformZ, width + 2, 0.1, platDepth, color);
 }
 
 function addBlock(x, y, z, w, h, d, color) {
@@ -1153,7 +1863,7 @@ let recoilPitch = 0, recoilYaw = 0;
 let mouseDeltaX = 0, mouseDeltaY = 0;
 let hp = 100;
 let currentWeaponKey = 'vandal';
-let ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
+let ammoByWeapon = freshAmmo();
 let isGrounded = false, isADS = false, cooldown = 0, reloadTimer = 0;
 let screenShake = 0;
 let sneakMode = false;
@@ -1168,13 +1878,15 @@ let dashCooldownTimer = 0, dashBoostTimer = 0;
 const keys = {};
 
 window.addEventListener('keydown', e => {
-  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyR', 'KeyC', 'KeyQ', 'Digit1', 'Digit2'].includes(e.code)) {
+  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyR', 'KeyC', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyE'].includes(e.code)) {
     if (document.pointerLockElement) e.preventDefault();
   }
   if (e.code === 'KeyC' && !keys['KeyC']) sneakMode = !sneakMode;
   if (e.code === 'KeyQ' && !keys['KeyQ']) tryDash();
   if (e.code === 'Digit1') switchWeapon('vandal');
   if (e.code === 'Digit2') switchWeapon('sidearm');
+  if (e.code === 'Digit3') switchWeapon('shotgun');
+  if (e.code === 'Digit4') switchWeapon('sniper');
   keys[e.code] = true;
   if (e.code === 'KeyR') tryReload();
 });
@@ -1204,7 +1916,26 @@ document.addEventListener('pointerlockchange', () => {
 const lockPrompt = document.getElementById('lockPrompt');
 lockPrompt.addEventListener('click', () => {
   if (document.activeElement) document.activeElement.blur();
-  canvas.requestPointerLock();
+  // unadjustedMovement: true で OS 側のマウス補正/予測を無効化し、
+  // Surface 等の高精度タッチパッド環境でキーボードと同時に
+  // マウス視点が入力されない問題を軽減する
+  try {
+    const res = canvas.requestPointerLock({ unadjustedMovement: true });
+    if (res && typeof res.catch === 'function') {
+      res.catch(() => { try { canvas.requestPointerLock(); } catch (e) {} });
+    }
+  } catch (e) {
+    try { canvas.requestPointerLock(); } catch (e2) {}
+  }
+});
+
+// タブ切替やフォーカス喪失時にキーが押しっぱなし判定になるのを防ぐ
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+  mouseDeltaX = 0; mouseDeltaY = 0; isADS = false;
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { for (const k in keys) keys[k] = false; isADS = false; }
 });
 
 window.addEventListener('mousedown', e => {
@@ -1231,7 +1962,7 @@ function tryReload() {
 }
 
 function tryDash() {
-  if (!isGameActive || dashCooldownTimer > 0) return;
+  if (!isGameActive || !amIAlive || dashCooldownTimer > 0) return;
   if (document.pointerLockElement !== canvas) return;
   dashBoostTimer = DASH_DURATION;
   dashCooldownTimer = DASH_COOLDOWN;
@@ -1240,52 +1971,71 @@ function tryDash() {
 }
 
 function shoot() {
-  if (hp <= 0) return;
+  if (hp <= 0 || !amIAlive) return;
   const w = WEAPONS[currentWeaponKey];
   if (cooldown > 0 || reloadTimer > 0) return;
   if (ammoByWeapon[currentWeaponKey] <= 0) { reloadTimer = w.reloadFrames; audio.playReload(); return; }
 
   ammoByWeapon[currentWeaponKey]--; cooldown = w.cooldown;
-  audio.playShoot();
+  audio.playShoot(currentWeaponKey);
   gunGroup.position.z += 0.12;
 
-  recoilPitch += 0.03;
+  recoilPitch += (currentWeaponKey === 'sniper') ? 0.09 : (currentWeaponKey === 'shotgun' ? 0.05 : 0.03);
   recoilYaw += (Math.random() - 0.5) * 0.015;
-  screenShake = Math.max(screenShake, 0.04);
+  screenShake = Math.max(screenShake, currentWeaponKey === 'sniper' ? 0.09 : 0.04);
 
   muzzleFlash.visible = true;
   muzzleLight.intensity = 3.5;
   muzzleTimer = 4;
 
-  const raycaster = new THREE.Raycaster();
-  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  raycaster.set(camera.position, dir);
+  const hitTargets = new Map(); // targetId -> {dmg, isHead, point}
+  const pelletCount = w.pellets || 1;
+  const hitboxList = collectHitboxes();
+  const allTargets = [...hitboxList, ...worldMeshes];
 
-  const endPoint = camera.position.clone().add(dir.clone().multiplyScalar(50));
-  const tracer = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([camera.position, endPoint]),
-    new THREE.LineBasicMaterial({ color: 0xff4655 })
-  );
-  scene.add(tracer); setTimeout(() => scene.remove(tracer), 20);
+  for (let p = 0; p < pelletCount; p++) {
+    let dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    if (w.spread > 0) {
+      dir.x += (Math.random() - 0.5) * w.spread;
+      dir.y += (Math.random() - 0.5) * w.spread;
+      dir.normalize();
+    }
+    const raycaster = new THREE.Raycaster();
+    raycaster.set(camera.position, dir);
 
-  const intersects = raycaster.intersectObjects([...collectHitboxes(), ...worldMeshes], false);
-  if (intersects.length > 0) {
-    const hit = intersects[0];
-    if (hit.object.userData && hit.object.userData.ownerId) {
-      const targetId = hit.object.userData.ownerId;
-      const isHead = hit.object.userData.type === 'head';
-      const dmg = isHead ? w.dmgHead : w.dmgBody;
+    const endPoint = camera.position.clone().add(dir.clone().multiplyScalar(50));
+    const tracer = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([camera.position, endPoint]),
+      new THREE.LineBasicMaterial({ color: 0xff4655 })
+    );
+    scene.add(tracer); setTimeout(() => scene.remove(tracer), 20);
 
-      emit({ type: 'hit', targetId, damage: dmg, isHeadshot: isHead });
-      showHitmarker();
-
-      if (isHead) { audio.playHeadshot(); createSparks(hit.point, 0xffcc00, 15); }
-      else { audio.playBodyHit(); createSparks(hit.point, 0xff4655, 8); }
-      spawnDamagePopup(dmg, hit.point, isHead);
-    } else {
-      createSparks(hit.point, 0x00ffcc, 4);
+    const intersects = raycaster.intersectObjects(allTargets, false);
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      if (hit.object.userData && hit.object.userData.ownerId) {
+        const targetId = hit.object.userData.ownerId;
+        const isHead = hit.object.userData.type === 'head';
+        const dmg = isHead ? w.dmgHead : w.dmgBody;
+        const prev = hitTargets.get(targetId);
+        if (!prev || (isHead && !prev.isHead)) {
+          hitTargets.set(targetId, { dmg: (prev ? prev.dmg : 0) + dmg, isHead: isHead || (prev && prev.isHead), point: hit.point });
+        } else {
+          prev.dmg += dmg;
+        }
+        if (isHead) { audio.playHeadshot(); createSparks(hit.point, 0xffcc00, pelletCount > 1 ? 6 : 15); }
+        else { audio.playBodyHit(); createSparks(hit.point, 0xff4655, pelletCount > 1 ? 3 : 8); }
+      } else {
+        createSparks(hit.point, 0x00ffcc, pelletCount > 1 ? 2 : 4);
+      }
     }
   }
+
+  hitTargets.forEach((info, targetId) => {
+    emit({ type: 'hit', targetId, damage: info.dmg, isHeadshot: info.isHead });
+    showHitmarker();
+    spawnDamagePopup(info.dmg, info.point, info.isHead);
+  });
 }
 
 function showHitmarker() {
@@ -1293,10 +2043,70 @@ function showHitmarker() {
   hm.style.opacity = '1'; setTimeout(() => hm.style.opacity = '0', 60);
 }
 
+// --- スパイク設置/解除 (中央エリアでEキー長押し) ---
+function updatePlantDefuse(dt) {
+  const progEl = document.getElementById('actionProgress');
+  const labelEl = document.getElementById('actionLabel');
+  const fillEl = document.getElementById('actionFill');
+
+  if (gameMode !== 'bomb' || !isGameActive || !amIAlive || roundPhase !== 'active' || document.pointerLockElement !== canvas) {
+    plantHoldMs = 0; defuseHoldMs = 0;
+    progEl.style.display = 'none'; labelEl.style.display = 'none';
+    return;
+  }
+
+  const zone = isGrounded ? findZoneAt(myX, myZ) : null;
+  const holding = !!keys['KeyE'];
+  const role = myRole();
+  let show = false, label = '', pct = 0;
+
+  if (role === 'attack' && spikeState === 'idle') {
+    if (zone && holding) {
+      plantHoldMs += dt;
+      show = true; label = `${zone.id}サイトに設置中…`; pct = Math.min(100, plantHoldMs / PLANT_TIME_MS * 100);
+      if (plantHoldMs >= PLANT_TIME_MS) { plantHoldMs = 0; emit({ type: 'spikePlant', site: zone.id }); }
+    } else { plantHoldMs = 0; }
+  } else if (role === 'defense' && spikeState === 'planted') {
+    if (zone && zone.id === spikeSite && holding) {
+      defuseHoldMs += dt;
+      show = true; label = `${zone.id}サイトを解除中…`; pct = Math.min(100, defuseHoldMs / DEFUSE_TIME_MS * 100);
+      if (defuseHoldMs >= DEFUSE_TIME_MS) { defuseHoldMs = 0; emit({ type: 'spikeDefuse' }); }
+    } else { defuseHoldMs = 0; }
+  }
+
+  progEl.style.display = show ? 'block' : 'none';
+  labelEl.style.display = show ? 'block' : 'none';
+  if (show) { labelEl.textContent = label; fillEl.style.width = pct + '%'; }
+}
+
+// --- ホストのみ: ラウンドタイマー / スパイク起爆タイマーの進行 ---
+function hostTick(dt) {
+  if (!isHost || gameMode !== 'bomb' || !isGameActive || roundPhase !== 'active') return;
+  if (spikeState === 'planted') {
+    spikeTimeLeft -= dt;
+    if (spikeTimeLeft <= 0) {
+      spikeTimeLeft = 0;
+      const msg = { type: 'spikeExplode' };
+      applyMessage(msg); broadcast(msg, null);
+      return;
+    }
+  } else if (spikeState === 'idle') {
+    roundTimeLeft -= dt;
+    if (roundTimeLeft <= 0) { roundTimeLeft = 0; endRound('defense'); return; }
+  }
+  hostTickAccum += dt;
+  if (hostTickAccum > 500) {
+    hostTickAccum = 0;
+    const msg = { type: 'roundTick', roundTimeLeft, spikeTimeLeft, spikeState };
+    broadcast(msg, null);
+    updateRoundHud();
+  }
+}
+
 // ==========================================
 // 5. Physics & Frame Loop
 // ==========================================
-function updatePhysics() {
+function updatePhysics(dt) {
   if (!isConnected || !isGameActive) return;
 
   recoilPitch *= 0.85;
@@ -1314,6 +2124,7 @@ function updatePhysics() {
   updateRadar();
   updateDashTag();
   updateRemoteLerp();
+  updatePlantDefuse(dt);
 
   if (hitStopFrames > 0) {
     hitStopFrames--;
@@ -1323,9 +2134,9 @@ function updatePhysics() {
 
   const locked = document.pointerLockElement === canvas;
 
-  if (locked && hp > 0) {
+  if (locked && hp > 0 && amIAlive) {
     if (mouseDeltaX !== 0 || mouseDeltaY !== 0) {
-      const sens = isADS ? 0.0012 : 0.0022;
+      const sens = isADS ? WEAPONS[currentWeaponKey].adsSens : 0.0022;
       yaw -= mouseDeltaX * sens;
       pitch -= mouseDeltaY * sens;
 
@@ -1362,7 +2173,7 @@ function updatePhysics() {
         stepAccum += speed;
         if (stepAccum > 1.1) {
           stepAccum = 0;
-          audio.playStep();
+          audio.playStep(0.18, 0);
           emit({ type: 'step' });
         }
       }
@@ -1378,10 +2189,11 @@ function updatePhysics() {
 
     myVy -= 0.012; myY += myVy;
 
+    const feetY = myY - 1.6;
     let floorY = 0;
     obstacles.forEach(o => {
       if (myX > o.minX && myX < o.maxX && myZ > o.minZ && myZ < o.maxZ) {
-        if (myY >= o.topY + 1.6) floorY = o.topY;
+        if ((o.topY - feetY) <= STEP_HEIGHT && o.topY > floorY) floorY = o.topY;
       }
     });
 
@@ -1406,7 +2218,7 @@ function updatePhysics() {
     } else { camera.rotation.z = 0; }
 
     gunGroup.position.lerp(isADS ? new THREE.Vector3(0, -0.12, -0.3) : new THREE.Vector3(0.2, -0.2, -0.4), 0.2);
-    camera.fov = THREE.MathUtils.lerp(camera.fov, isADS ? 50 : 75, 0.2);
+    camera.fov = THREE.MathUtils.lerp(camera.fov, isADS ? WEAPONS[currentWeaponKey].adsFov : 75, isADS ? 0.15 : 0.2);
     camera.updateProjectionMatrix();
 
     if (cooldown > 0) cooldown--;
@@ -1471,55 +2283,42 @@ function updateRadar() {
 
 function checkCollision(nx, nz) {
   const r = 0.5;
+  const feetY = myY - 1.6;
   for (let o of obstacles) {
     if (nx + r > o.minX && nx - r < o.maxX && nz + r > o.minZ && nz - r < o.maxZ) {
-      if (myY < o.topY + 1.2) return true;
+      if ((o.topY - feetY) > STEP_HEIGHT) return true;
     }
   }
   return false;
 }
 
-// --- リスポーン / 試合終了 / リスタート ---
-function respawnSelf() {
-  if (!isGameActive) return;
-  const s = nextSpawn();
-  myX = s.x; myZ = s.z; myY = 1.6; yaw = s.yaw; pitch = 0; myVy = 0;
-  camera.rotation.set(0, yaw, 0, 'YXZ');
-  hp = 100;
-  ammoByWeapon = { vandal: WEAPONS.vandal.mag, sidearm: WEAPONS.sidearm.mag };
-  reloadTimer = 0;
-}
-
-function showMatchEnd(winnerId) {
-  try { document.exitPointerLock(); } catch (e) {}
-  const overlay = document.getElementById('matchEndOverlay');
-  const title = document.getElementById('endTitle');
-  const won = winnerId === myId;
-  title.textContent = won ? 'YOU WIN' : (nameOf(winnerId) + ' WINS');
-  title.className = 'end-title ' + (won ? 'win' : 'lose');
-  document.getElementById('btnRestart').style.display = isHost ? 'block' : 'none';
-  renderScoreboard();
-  overlay.style.display = 'flex';
-}
-
+// --- 試合リスタート ---
 function doRestartLocal() {
-  scoreboard.forEach(v => v.score = 0);
-  pointBannerShown = false;
   document.getElementById('matchEndOverlay').style.display = 'none';
   isGameActive = true;
-  respawnSelf();
-  renderScoreboard();
 }
 
 function hostRestart() {
   if (!isHost) return;
-  doRestartLocal();
   broadcast({ type: 'restart' }, null);
+  doRestartLocal();
+  if (gameMode === 'bomb') {
+    currentRound = 1; roundsWon = { A: 0, B: 0 };
+  } else {
+    scoreboard.forEach(v => v.score = 0);
+    renderScoreboard();
+  }
+  beginMatchFlow();
 }
 
 function animate() {
   requestAnimationFrame(animate);
-  updatePhysics();
+  const now = performance.now();
+  let dt = now - lastFrameTime;
+  lastFrameTime = now;
+  if (dt > 100) dt = 100; // タブ非アクティブ復帰時などの大きな飛びを抑える
+  updatePhysics(dt);
+  if (isHost) hostTick(dt);
   renderer.render(scene, camera);
 }
 
