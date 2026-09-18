@@ -208,11 +208,17 @@
     #roundPanel .rp-timer { font-size: 13px; color: #ffcc00; font-weight: 800; margin-top: 2px; }
     #spikeStatus { font-size: 11px; font-weight: 900; margin-top: 4px; display: none; }
 
-    #dmPanel {
+    #dmPanel, #ggPanel {
       position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
       background: rgba(13, 19, 34, 0.85); border: 1px solid #334466; border-radius: 8px;
       padding: 8px 22px; text-align: center; min-width: 200px;
     }
+    .gg-dot {
+      width: 14px; height: 14px; border-radius: 3px; background: #334466;
+      border: 1px solid #556688;
+    }
+    .gg-dot.done { background: #00ffcc; border-color: #00ffcc; }
+    .gg-dot.current { background: #ffcc00; border-color: #ffcc00; }
 
     #actionLabel {
       position: absolute; bottom: 134px; left: 50%; transform: translate(-50%, 0);
@@ -283,6 +289,12 @@
   <div id="dmPanel" style="display:none;">
     <div class="rp-title">DEATHMATCH</div>
     <div class="rp-score" style="color:#fff;"><span id="dmLeaderScore">0</span> <span style="font-size:14px;color:#667a9a;">/ <span id="dmLimit">5</span> KILLS</span></div>
+  </div>
+
+  <div id="ggPanel" style="display:none;">
+    <div class="rp-title">GUN GAME</div>
+    <div class="rp-score" style="color:#fff; font-size:16px;" id="ggWeaponName">PISTOL</div>
+    <div id="ggLadder" style="display:flex; gap:4px; justify-content:center; margin-top:6px;"></div>
   </div>
 
   <div id="actionLabel">設置中…</div>
@@ -372,6 +384,10 @@
         <div class="mo-title">デスマッチ</div>
         <div class="mo-desc">即リスポーン・撃ち合い</div>
       </div>
+      <div class="mode-opt" id="modeBtnGg" onclick="selectGameMode('gungame')">
+        <div class="mo-title">ガンゲーム</div>
+        <div class="mo-desc">キルで武器が進化・早い者勝ち</div>
+      </div>
     </div>
 
     <button class="btn" id="btnAutoMatch" disabled onclick="startAutoMatch()">対戦相手を自動で探す</button>
@@ -421,7 +437,15 @@ const ROOM_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 紛らわしい 0/
 const ICE_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // STUNだけでは直接経路が張れない組み合わせ(別々のWi-Fi/モバイル回線など、
+    // 対称NAT環境)でP2P接続がそもそも成立せず「開通したように見えて実は
+    // つながらない」状態になっていた。TURN中継サーバーをフォールバックに
+    // 追加することで、直接経路が無理な場合でも中継経由で接続できるようにする。
+    { urls: 'stun:openrelay.metered.ca:80' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
   ]
 };
 const LOBBY_SLOTS = ['CS-ARENA-1','CS-ARENA-2','CS-ARENA-3','CS-ARENA-4','CS-ARENA-5','CS-ARENA-6'];
@@ -437,6 +461,10 @@ function freshAmmo() {
   for (const k in WEAPONS) obj[k] = WEAPONS[k].mag;
   return obj;
 }
+
+// ガンゲーム用の武器進行順(キルするたびに次へ進む。最終武器でキルすると勝利)
+const WEAPON_LADDER = ['sidearm', 'shotgun', 'vandal', 'sniper'];
+function ggWeaponForTier(tier) { return WEAPON_LADDER[Math.min(tier, WEAPON_LADDER.length - 1)]; }
 
 const COLOR_POOL = [0xff4655, 0x00ffcc, 0x0088ff, 0xffaa00, 0x8855ff, 0x33ff77];
 const SPAWN_POINTS = [
@@ -670,6 +698,7 @@ function selectGameMode(mode) {
   gameMode = mode;
   document.getElementById('modeBtnBomb').classList.toggle('sel', mode === 'bomb');
   document.getElementById('modeBtnDm').classList.toggle('sel', mode === 'deathmatch');
+  document.getElementById('modeBtnGg').classList.toggle('sel', mode === 'gungame');
 }
 
 function setLobbyError(msg) { document.getElementById('lobbyErr').textContent = msg || ""; }
@@ -746,10 +775,22 @@ function applyMessage(msg) {
           if (rp) rp.group.visible = false;
         }
         if (isHost) checkRoundElimination();
+      } else if (gameMode === 'gungame') {
+        if (isHost) checkGgWin(msg.killerId);
       } else {
         updateDmHud();
         if (isHost) checkDmWin(msg.killerId);
       }
+      break;
+    }
+    case 'ggTierUpdate': {
+      if (scoreboard.has(msg.id)) scoreboard.get(msg.id).tier = msg.tier;
+      if (msg.id === myId) {
+        currentWeaponKey = ggWeaponForTier(msg.tier);
+        ammoByWeapon[currentWeaponKey] = WEAPONS[currentWeaponKey].mag;
+        reloadTimer = 0;
+      }
+      updateGgHud();
       break;
     }
     case 'join': {
@@ -823,7 +864,7 @@ function reportDeath(killerId) {
   if (isHost) broadcast(payload, null);
   else if (hostConn && hostConn.open) { try { hostConn.send(payload); } catch (e) {} }
 
-  if (gameMode === 'deathmatch') {
+  if (gameMode === 'deathmatch' || gameMode === 'gungame') {
     respawnSelfDM();
   } else {
     amIAlive = false;
@@ -832,16 +873,21 @@ function reportDeath(killerId) {
   }
 }
 
-// --- デスマッチ: 即リスポーン ---
+// --- デスマッチ/ガンゲーム共通: 即リスポーン ---
 function respawnSelfDM() {
   if (!isGameActive) return;
   const s = nextSpawn();
   myX = s.x; myZ = s.z; myY = 1.6; yaw = s.yaw; pitch = 0; myVy = 0;
   camera.rotation.set(0, yaw, 0, 'YXZ');
   hp = 100;
-  ammoByWeapon = freshAmmo();
   reloadTimer = 0;
   amIAlive = true;
+  if (gameMode === 'gungame') {
+    // 死んでも階級は下がらない。今の武器の弾だけ補充する
+    ammoByWeapon[currentWeaponKey] = WEAPONS[currentWeaponKey].mag;
+  } else {
+    ammoByWeapon = freshAmmo();
+  }
 }
 
 function checkDmWin(killerId) {
@@ -849,6 +895,23 @@ function checkDmWin(killerId) {
   if (entry && entry.score >= SCORE_LIMIT && isGameActive) {
     isGameActive = false;
     const msg = { type: 'dmMatchEnd', winnerId: killerId };
+    applyMessage(msg); broadcast(msg, null);
+  }
+}
+
+// --- ガンゲーム: キルした側の階級を進める(ホスト権威) ---
+function checkGgWin(killerId) {
+  if (!isGameActive) return;
+  const entry = scoreboard.get(killerId);
+  if (!entry) return;
+  const nextTier = (entry.tier || 0) + 1;
+  if (nextTier >= WEAPON_LADDER.length) {
+    isGameActive = false;
+    entry.tier = WEAPON_LADDER.length;
+    const msg = { type: 'dmMatchEnd', winnerId: killerId };
+    applyMessage(msg); broadcast(msg, null);
+  } else {
+    const msg = { type: 'ggTierUpdate', id: killerId, tier: nextTier };
     applyMessage(msg); broadcast(msg, null);
   }
 }
@@ -866,13 +929,14 @@ function showDmMatchEnd(winnerId) {
   overlay.style.display = 'flex';
 }
 
-// --- デスマッチ開始(ホストのみ) ---
+// --- デスマッチ/ガンゲーム開始(ホストのみ) ---
 function startDeathmatch() {
   if (!isHost) return;
   const allIds = [myId, ...guestConns.keys()];
   if (allIds.length < 2) { waitForOpponent(); return; }
   spawnCursor = 0;
   pointBannerShown = false;
+  scoreboard.forEach(v => { v.score = 0; v.tier = 0; });
   const assignments = {};
   allIds.forEach(id => {
     const sp = nextSpawn();
@@ -887,8 +951,14 @@ function startDeathmatch() {
 function applyDmStart(msg) {
   isGameActive = true; isConnected = true;
   amIAlive = true; hp = 100;
-  ammoByWeapon = freshAmmo();
   reloadTimer = 0; pointBannerShown = false;
+  if (gameMode === 'gungame') {
+    if (scoreboard.has(myId)) scoreboard.get(myId).tier = 0;
+    currentWeaponKey = ggWeaponForTier(0);
+    ammoByWeapon = freshAmmo();
+  } else {
+    ammoByWeapon = freshAmmo();
+  }
   gunGroup.visible = true;
   document.getElementById('lobbyModal').style.display = 'none';
   document.getElementById('hud').style.display = 'block';
@@ -912,9 +982,11 @@ function applyDmStart(msg) {
     }
   });
   updateDmHud();
+  updateGgHud();
 }
 
 function updateDmHud() {
+  if (gameMode !== 'deathmatch') return;
   let leaderScore = 0;
   scoreboard.forEach(v => { if (v.score > leaderScore) leaderScore = v.score; });
   const a = document.getElementById('dmLeaderScore'); if (a) a.textContent = leaderScore;
@@ -928,10 +1000,32 @@ function updateDmHud() {
   updateNameTag();
 }
 
-// モード切り替えに応じてラウンドHUD/デスマッチHUDの表示を切り替える
+function updateGgHud() {
+  if (gameMode !== 'gungame') return;
+  const myTier = (scoreboard.get(myId) && scoreboard.get(myId).tier) || 0;
+  const nameEl = document.getElementById('ggWeaponName');
+  if (nameEl) nameEl.textContent = WEAPONS[ggWeaponForTier(myTier)].name;
+  const ladderEl = document.getElementById('ggLadder');
+  if (ladderEl) {
+    ladderEl.innerHTML = WEAPON_LADDER.map((w, i) => {
+      const cls = i < myTier ? 'done' : (i === myTier ? 'current' : '');
+      return `<div class="gg-dot ${cls}"></div>`;
+    }).join('');
+  }
+  if (!pointBannerShown && myTier === WEAPON_LADDER.length - 1) {
+    pointBannerShown = true;
+    const el = document.getElementById('pointBanner');
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1200);
+  }
+  updateNameTag();
+}
+
+// モード切り替えに応じてラウンドHUD/デスマッチHUD/ガンゲームHUDの表示を切り替える
 function showModeHud() {
   document.getElementById('roundPanel').style.display = (gameMode === 'bomb') ? 'block' : 'none';
   document.getElementById('dmPanel').style.display = (gameMode === 'deathmatch') ? 'block' : 'none';
+  document.getElementById('ggPanel').style.display = (gameMode === 'gungame') ? 'block' : 'none';
 }
 
 // gameModeに応じて実際のマッチ開始処理へ振り分ける(ホストのみ)
@@ -1204,7 +1298,7 @@ function handleJoin(id, name, color, pos) {
     id, group, hitboxGroup, color, name,
     target: { x: pos.x, y: pos.y || 1.6, z: pos.z, yaw: pos.yaw || 0 }
   });
-  if (!scoreboard.has(id)) scoreboard.set(id, { name, color, score: 0 });
+  if (!scoreboard.has(id)) scoreboard.set(id, { name, color, score: 0, tier: 0 });
   createRadarDot(id, color);
   renderScoreboard();
 }
@@ -1298,7 +1392,7 @@ function initializeAsHost() {
   playerTeams.clear();
   myTeam = TEAM_A;
   playerTeams.set(myId, myTeam);
-  scoreboard.set(myId, { name: myName, color: myColor, score: 0 });
+  scoreboard.set(myId, { name: myName, color: myColor, score: 0, tier: 0 });
   currentRound = 1; roundsWon = { A: 0, B: 0 }; pointBannerShown = false;
   camera.rotation.set(0, 0, 0, 'YXZ');
   showModeHud();
@@ -1384,7 +1478,7 @@ function tryJoinSlot(slotId) {
     const timer = setTimeout(() => {
       try { testConn.close(); } catch (e) {}
       finish(false);
-    }, 3500);
+    }, 5500);
 
     testConn.on('data', data => {
       if (data && data.type === 'welcome') finish(true);
@@ -1531,18 +1625,33 @@ function setupConnection(conn) {
   if (conn.open) { onOpen(); } else { conn.on('open', onOpen); }
 
   let receivedWelcome = false;
+  // 手動でのルームコード参加時、WebRTCの接続確立自体が(TURN経由も含めて)
+  // 何らかの理由で止まってしまうと open/close/error のどれも発火せず
+  // 無言で固まり続けることがあるため、上限時間を設けて必ず結果を返す。
+  let joinTimeout = null;
+  if (!matchmakingActive) {
+    joinTimeout = setTimeout(() => {
+      if (!receivedWelcome) {
+        setLobbyError('接続がタイムアウトしました。回線を確認して再試行してください。');
+        try { conn.close(); } catch (e) {}
+      }
+    }, 12000);
+  }
+
   conn.on('data', data => {
     if (!data || !data.type) return;
-    if (data.type === 'welcome') { receivedWelcome = true; applyWelcome(data); }
+    if (data.type === 'welcome') { receivedWelcome = true; if (joinTimeout) clearTimeout(joinTimeout); applyWelcome(data); }
     else { applyMessage(data); }
   });
   conn.on('close', () => {
+    if (joinTimeout) clearTimeout(joinTimeout);
     if (!receivedWelcome && !matchmakingActive) {
       setLobbyError('ルームに参加できませんでした(満員の可能性があります)。コードを確認して再試行してください。');
     }
     handleDisconnect();
   });
   conn.on('error', () => {
+    if (joinTimeout) clearTimeout(joinTimeout);
     if (!receivedWelcome && !matchmakingActive) {
       setLobbyError('ルームへの接続に失敗しました。回線を確認して再試行してください。');
     }
@@ -1556,6 +1665,7 @@ function applyWelcome(data) {
   myX = data.spawn.x; myZ = data.spawn.z; myY = 1.6; yaw = data.spawn.yaw || 0; pitch = 0; myVy = 0;
   hp = 100; amIAlive = true;
   ammoByWeapon = freshAmmo();
+  if (gameMode === 'gungame') currentWeaponKey = ggWeaponForTier(0);
   pointBannerShown = false;
 
   scoreboard.clear();
@@ -1563,7 +1673,7 @@ function applyWelcome(data) {
   remotePlayers.clear();
   playerTeams.clear();
   playerTeams.set(myId, myTeam);
-  scoreboard.set(myId, { name: myName, color: myColor, score: 0 });
+  scoreboard.set(myId, { name: myName, color: myColor, score: 0, tier: 0 });
 
   currentRound = data.round; roundsWon = { A: data.scoreA, B: data.scoreB };
   roundPhase = data.roundPhase; spikeState = data.spikeState; spikeSite = data.spikeSite || null;
@@ -1572,7 +1682,7 @@ function applyWelcome(data) {
   (data.roster || []).forEach(p => {
     playerTeams.set(p.id, p.team);
     handleJoin(p.id, p.name, p.color, { x: p.x, y: p.y, z: p.z, yaw: p.yaw });
-    if (scoreboard.has(p.id)) scoreboard.get(p.id).score = p.score || 0;
+    if (scoreboard.has(p.id)) { scoreboard.get(p.id).score = p.score || 0; scoreboard.get(p.id).tier = p.tier || 0; }
   });
 
   document.getElementById('lobbyModal').style.display = 'none';
@@ -1583,7 +1693,7 @@ function applyWelcome(data) {
   isConnected = true; isGameActive = true;
   camera.rotation.set(0, yaw, 0, 'YXZ');
   renderScoreboard();
-  if (gameMode === 'bomb') updateRoundHud(); else updateDmHud();
+  if (gameMode === 'bomb') updateRoundHud(); else if (gameMode === 'gungame') updateGgHud(); else updateDmHud();
 }
 
 // --- ホスト側: 新規ゲスト接続の受け入れ ---
@@ -1605,7 +1715,7 @@ function handleNewGuestConnection(conn) {
     } else {
       spawn = nextSpawn();
     }
-    scoreboard.set(id, { name, color, score: 0 });
+    scoreboard.set(id, { name, color, score: 0, tier: 0 });
 
     const roster = [];
     scoreboard.forEach((v, k) => {
@@ -1616,7 +1726,7 @@ function handleNewGuestConnection(conn) {
         const rp = remotePlayers.get(k);
         pos = rp ? { x: rp.group.position.x, y: rp.group.position.y + 1.6, z: rp.group.position.z, yaw: rp.group.rotation.y } : { x: 0, y: 1.6, z: 0, yaw: 0 };
       }
-      roster.push({ id: k, name: v.name, color: v.color, score: v.score, team: playerTeams.get(k), x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw });
+      roster.push({ id: k, name: v.name, color: v.color, score: v.score, tier: v.tier, team: playerTeams.get(k), x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw });
     });
 
     try {
@@ -1705,7 +1815,8 @@ function buildMap() {
   grid.position.y = 0.01; scene.add(grid);
 
   const LANE_COLOR = 0x445577, SITE_A_COLOR = 0xdd6644, SITE_B_COLOR = 0x4488dd,
-        TOWER_COLOR = 0x8899bb, CRATE_COLOR = 0x556688, RISER_COLOR = 0xccaa44;
+        TOWER_COLOR = 0x8899bb, CRATE_COLOR = 0x556688, RISER_COLOR = 0xccaa44,
+        WINDOW_COLOR = 0x667799, BACK_COLOR = 0x556080;
 
   // --- Aレーン(西側) : 攻撃側スポーンからAサイトへ ---
   addBlock(-24, 1.5, -20, 1, 3, 24, LANE_COLOR);
@@ -1719,10 +1830,16 @@ function buildMap() {
   addBlock(21, 1, -32, 5, 2, 2, LANE_COLOR);
   addBlock(13, 1, -32, 5, 2, 2, LANE_COLOR);
 
-  // --- ミッド(中央連絡路) : タワーで高低差を作る ---
+  // --- ミッド(中央連絡路) : 2段構えのタワーで高低差を作る ---
   addBlock(-3.5, 1, -6, 2, 2, 10, TOWER_COLOR);
   addBlock(3.5, 1, -6, 2, 2, 10, TOWER_COLOR);
-  buildStairs(0, 3, 1, 6, 0.5, 1.3, 4, TOWER_COLOR); // ミッドタワー階段(南から登る)
+  const midTier1 = buildStairs(0, 3, 1, 5, 0.5, 1.1, 4, TOWER_COLOR); // 1段目(高さ2.5)
+  const midTier2 = buildStairs(0, midTier1.platformZ + midTier1.platDepth / 2, 1, 3, 0.5, 0.8, 3, TOWER_COLOR, midTier1.topY); // 2段目、さらに高さ1.5追加(合計4)し狙撃ポイントに
+  // ミッドの覗き窓(下は隠れられる/上は屋根、間の隙間から撃ち合える)
+  addBlock(-7, 0.65, -16, 1, 1.3, 6, WINDOW_COLOR);
+  addBlock(-7, 2.65, -16, 1, 0.7, 6, WINDOW_COLOR);
+  addBlock(7, 0.65, -16, 1, 1.3, 6, WINDOW_COLOR);
+  addBlock(7, 2.65, -16, 1, 0.7, 6, WINDOW_COLOR);
 
   // --- Aサイト: コの字型カバー(攻撃側から見て入口は開放) ---
   addBlock(-18, 1.5, 8, 10, 3, 1, SITE_A_COLOR);   // 奥壁
@@ -1738,6 +1855,13 @@ function buildMap() {
   addBlock(19, 0.6, -1, 3, 1.2, 3, CRATE_COLOR);
   buildStairs(15.5, 5.5, -1, 2, 0.5, 1.2, 3, RISER_COLOR);
 
+  // --- 裏取りルート: 両サイトの裏を横につなぐ連絡路(ミッドタワーの北端より奥、
+  // ディフェンス側スポーン前カバーより手前の空間を使う) ---
+  addBlock(0, 1.5, 20, 30, 3, 1, BACK_COLOR);  // 南側の壁
+  addBlock(0, 1.5, 26, 30, 3, 1, BACK_COLOR);  // 北側の壁
+  addBlock(-6, 0.8, 23, 3, 1.6, 3, CRATE_COLOR); // 通路内のジグザグカバー
+  addBlock(6, 0.8, 23, 3, 1.6, 3, CRATE_COLOR);
+
   // --- ディフェンス側スポーン手前のカバー ---
   addBlock(-18, 1, 30, 6, 2, 3, LANE_COLOR);
   addBlock(18, 1, 30, 6, 2, 3, LANE_COLOR);
@@ -1746,6 +1870,10 @@ function buildMap() {
   // --- 攻撃側スポーン手前のカバー ---
   addBlock(-8, 0.8, -34, 3, 1.6, 3, CRATE_COLOR);
   addBlock(8, 0.8, -34, 3, 1.6, 3, CRATE_COLOR);
+
+  // --- レーン中間の追加カバー(視線の通し過ぎを防ぐ) ---
+  addBlock(-17.5, 0.7, -26, 2.5, 1.4, 2.5, CRATE_COLOR);
+  addBlock(17.5, 0.7, -26, 2.5, 1.4, 2.5, CRATE_COLOR);
 
   // --- 各ボムサイトの地面マーカー(A/Bで色分け) ---
   PLANT_ZONES.forEach(zn => {
@@ -1761,17 +1889,20 @@ function buildMap() {
 }
 
 // 階段ブロックを積んで実際に歩いて登れる段差を作る(STEP_HEIGHTの自動よじ登り判定と対応)
-// dir: +1 なら+z方向、-1なら-z方向へ登っていく
-function buildStairs(cx, cz0, dir, steps, stepH, stepDepth, width, color) {
+// dir: +1 なら+z方向、-1なら-z方向へ登っていく。baseHを渡すと、その高さから続けて登る2段目の階段を作れる。
+function buildStairs(cx, cz0, dir, steps, stepH, stepDepth, width, color, baseH) {
+  baseH = baseH || 0;
   for (let i = 0; i < steps; i++) {
-    const h = stepH * (i + 1);
+    const blockH = stepH * (i + 1);
+    const yCenter = baseH + blockH / 2;
     const zOff = cz0 + dir * (i * stepDepth + stepDepth / 2);
-    addBlock(cx, h / 2, zOff, width, h, stepDepth, color);
+    addBlock(cx, yCenter, zOff, width, blockH, stepDepth, color);
   }
-  const topH = stepH * steps;
+  const topY = baseH + stepH * steps;
   const platDepth = width;
   const platformZ = cz0 + dir * (steps * stepDepth + platDepth / 2);
-  addBlock(cx, topH - 0.05, platformZ, width + 2, 0.1, platDepth, color);
+  addBlock(cx, topY - 0.05, platformZ, width + 2, 0.1, platDepth, color);
+  return { topY, platformZ, platDepth };
 }
 
 function addBlock(x, y, z, w, h, d, color) {
@@ -1948,6 +2079,7 @@ window.addEventListener('mouseup', e => { if (e.button === 2) isADS = false; });
 window.addEventListener('contextmenu', e => e.preventDefault());
 
 function switchWeapon(key) {
+  if (gameMode === 'gungame') return; // ガンゲームでは武器は階級で自動決定される
   if (currentWeaponKey === key) return;
   currentWeaponKey = key;
   reloadTimer = 0;
@@ -2304,9 +2436,6 @@ function hostRestart() {
   doRestartLocal();
   if (gameMode === 'bomb') {
     currentRound = 1; roundsWon = { A: 0, B: 0 };
-  } else {
-    scoreboard.forEach(v => v.score = 0);
-    renderScoreboard();
   }
   beginMatchFlow();
 }
